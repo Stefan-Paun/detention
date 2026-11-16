@@ -20,7 +20,7 @@ Nachsitzen läuft nur auf deinem Rechner. Die Figuren denken mit Claude; dafür 
 **2. Holen**
 
 ```
-git clone https://github.com/Stefan-Paun/nachsitzen.git
+git clone https://github.com/Stefan-Paun/detention.git
 cd nachsitzen
 ```
 
