@@ -6,6 +6,7 @@ Werwolf-artiges Spiel: Stefan + sechs Claude-Figuren (Mira, Jonas, Lea, Tarik, N
 
 - `npm test`: alles ohne Netz (Regeln, Gehirn mit Fake-API, Kosten, Simulation). Exit-Code prüfen.
 - `npm run simuliere`: Partien mit Skript-Gehirnen, kostet nichts.
+- `npm run labor`: Regelvarianten in je 2000 Skript-Partien vergleichen (Tabelle + `ausgabe/labor.html`, kostet nichts). Befund in `docs/balance-labor.md`.
 - `npm run spiele` / `-- --zuschauen`: echte Haiku-Aufrufe, Cent-Beträge. Nur nach Stefans OK starten.
 - `node tools/zug.mjs <port> …`: mitspielen von der Kommandozeile (auch für Test-Agenten). `GET /verlauf?ab=n` liefert sichtbare Ereignisse als JSON.
 - Tester-Runde 31.10.: 10 Agenten mit Personas spielten je eine Partie (eigene Server 4810–4819 mit `XDG_DATA_HOME` je Agent). Feedback floss in v1.1 ein (geheime Abstimmung, Nacht-1-Schutz, Vorzeigen).
@@ -13,6 +14,7 @@ Werwolf-artiges Spiel: Stefan + sechs Claude-Figuren (Mira, Jonas, Lea, Tarik, N
 ## Aufbau
 
 - `spiel/partie.mjs`: Regeln. Jedes Ereignis hat `sichtbar` (wer es sehen darf); `verlaufFuer(name)` ist der Kontext einer Figur. Rollen, Platz, Nachtwahl, Prüfung, Beobachtungen und Untersuchungsergebnisse bleiben privat.
+- `spiel/regeln.mjs`: Stellschrauben als ein Objekt (`STANDARD_REGELN` = heutiges Spiel). Server und Claude-Gehirn nutzen nur den Standard; Abweichungen (`neuePartie(..., { regeln })`) sind für `tools/labor.mjs`. Stichwahl und Schlussnacht sind in Browser und Claude-Prompt nicht eigens erklärt.
 - `spiel/welt.mjs`: die Wahrheit hinter dem Gerede: Orte, Weg des Schattens, Beobachtungen, Funde, Tagesereignisse, Untersuchungen. Alles, was daraus kommt, muss wahr sein (Tests prüfen das).
 - `spiel/gehirn.mjs`: Claude-Gehirn (Systemprompt aus `prompts/` + `figuren/`, Werkzeuge je Phase, Rückfall bei Unsinn). Gleiche Schnittstelle wie `tools/skriptgehirne.mjs`.
 - `spiel/claude.mjs`: Messages-API per fetch. Haiku 5.5: kein Prefill, keine temperature, `thinking: disabled` + `effort: low`, Refusal ist HTTP 200. Nullable Enums als `anyOf`, nicht `type: [..., 'null']`; bei `strict: true` kein `minimum`/`maximum`, stattdessen `enum`.
