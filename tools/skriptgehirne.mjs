@@ -25,7 +25,18 @@ function entlarver(sicht, name, kandidaten) {
   return k.length ? k.at(-1).von : null
 }
 
-export function skriptGehirn(name, rolle, zufall, { mitPetze = true } = {}) {
+// Wen der Skript-Schatten nachts holt, wenn ihn niemand entlarvt hat. 'lauteste' ist der Standard.
+export const SCHATTEN_STRATEGIEN = ['lauteste', 'leiseste', 'zufall']
+
+function leiseste(sicht, kandidaten) {
+  const z = {}
+  for (const e of sicht) if (e.art === 'sagt') z[e.von] = (z[e.von] || 0) + 1
+  return [...kandidaten].sort((a, b) => (z[a] || 0) - (z[b] || 0))[0]
+}
+
+export function skriptGehirn(name, rolle, zufall, { mitPetze = true, schattenStrategie = 'lauteste' } = {}) {
+  if (!SCHATTEN_STRATEGIEN.includes(schattenStrategie)) throw new Error(`Unbekannte Schatten-Strategie: ${String(schattenStrategie).slice(0, 40)}`)
+  const holen = (sicht, k) => schattenStrategie === 'zufall' ? zufall.aus(k) : schattenStrategie === 'leiseste' ? leiseste(sicht, k) : lauteste(sicht, k)
   const geprueft = {}             // nur Schluesseltraeger und Petze fuellen das: Name -> ist Schatten
   const gesehen = {}              // nur die Petze: Name -> Rolle, die sie erfahren hat
   let meinPlatz = null
@@ -37,7 +48,7 @@ export function skriptGehirn(name, rolle, zufall, { mitPetze = true } = {}) {
     nacht(sicht, lebende, { orte, ziele, petzeAktiv = true }) {
       const andere = lebende.filter((n) => n !== name)
       meinPlatz = zufall.aus(orte)
-      if (rolle === SCHATTEN) return { platz: meinPlatz, ziel: entlarver(sicht, name, ziele ?? andere) ?? lauteste(sicht, ziele ?? andere) }
+      if (rolle === SCHATTEN) return { platz: meinPlatz, ziel: entlarver(sicht, name, ziele ?? andere) ?? holen(sicht, ziele ?? andere) }
       if (rolle === SCHLUESSEL) {
         const offen = andere.filter((n) => !(n in geprueft))
         return { platz: meinPlatz, ziel: offen.length ? zufall.aus(offen) : zufall.aus(andere) }
@@ -72,9 +83,11 @@ export function skriptGehirn(name, rolle, zufall, { mitPetze = true } = {}) {
       const ziel = rolle === SCHATTEN ? zufall.aus(andere) : (Object.entries(beschuldigungen(sicht)).filter(([n]) => andere.includes(n)).sort((a, b) => b[1] - a[1])[0]?.[0] ?? zufall.aus(andere))
       return { art: 'sagt', an: ziel, text: `${ziel}, du warst nicht an deinem Platz.` }
     },
-    abstimmung(sicht, lebende) {
-      const andere = lebende.filter((n) => n !== name)
-      const bekannt = Object.entries(geprueft).find(([n, s]) => s && lebende.includes(n))
+    abstimmung(sicht, lebende, { kandidaten = null } = {}) {
+      // Stichwahl: nur die Gleichen stehen zur Wahl (ohne Stichwahl ist die Liste wie bisher)
+      const andere = (kandidaten ?? lebende).filter((n) => n !== name)
+      if (!andere.length) return { fuer: null }
+      const bekannt = Object.entries(geprueft).find(([n, s]) => s && andere.includes(n))
       if (bekannt) return { fuer: bekannt[0] }
       const b = beschuldigungen(sicht)
       const sauber = andere.filter((n) => geprueft[n] !== false)
