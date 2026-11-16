@@ -168,8 +168,9 @@ export function leseArgumente(argv) {
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     const wert = () => { if (i + 1 >= argv.length) throw new Error(`${a} braucht einen Wert`); return argv[++i] }
-    if (a === '--partien') o.partien = Number(wert())
-    else if (a === '--startwert') o.startwert = Number(wert())
+    const ganzzahl = () => { const w = wert(); if (!/^\d{1,10}$/.test(w)) throw new Error(`${a} braucht eine ganze Zahl`); return Number(w) }
+    if (a === '--partien') o.partien = ganzzahl()
+    else if (a === '--startwert') o.startwert = ganzzahl()
     else if (a === '--varianten') o.varianten = wert()
     else if (a === '--aus') o.aus = resolve(wert())
     else if (a === '--kein-html') o.html = false
@@ -180,9 +181,12 @@ export function leseArgumente(argv) {
 }
 
 export function leseVariantenDatei(pfad) {
-  if (statSync(pfad).size > 64 * 1024) throw new Error('Variantendatei ist größer als 64 KB')
+  const st = statSync(pfad)
+  if (!st.isFile()) throw new Error('Variantendatei ist keine normale Datei')
+  if (st.size > 64 * 1024) throw new Error('Variantendatei ist größer als 64 KB')
+  const text = readFileSync(pfad, 'utf8')
   let daten
-  try { daten = JSON.parse(readFileSync(pfad, 'utf8')) } catch (f) { throw new Error(`Variantendatei ist kein gültiges JSON: ${f.message}`) }
+  try { daten = JSON.parse(text) } catch (f) { throw new Error(`Variantendatei ist kein gültiges JSON: ${f.message}`) }
   return pruefeVarianten(daten)
 }
 

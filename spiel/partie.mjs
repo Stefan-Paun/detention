@@ -16,7 +16,7 @@ export const PETZE_JEDE = STANDARD_REGELN.petzeJede         // die Petze erfaehr
 export const MAX_UNTERSUCHUNGEN = STANDARD_REGELN.maxUntersuchungen  // pro Figur und Partie (sonst ist die Wahrheit zu billig)
 
 // `regeln`: Abweichungen vom Standard (spiel/regeln.mjs), nur fuer Labor und Tests. `petze`/`petzeJede`
-// direkt in den Optionen gehen wie bisher und haben Vorrang.
+// direkt in den Optionen gehen wie bisher und haben Vorrang (neu: petzeJede wird wie jede Regel geprueft, 1 bis 10).
 export function neuePartie(namen, zufall, { spieler = null, petze = null, petzeJede, regeln = null } = {}) {
   const r = regelnMit({ ...regeln, ...(petze != null ? { petze } : {}), ...(petzeJede != null ? { petzeJede } : {}) })
   const rollen = verteileRollen(namen, zufall, { petze: r.petze, petzeAb: r.petzeAb })
@@ -265,12 +265,15 @@ export function abstimmungSchliessen(p) {
   const fehlt = p.lebende.filter((n) => !(n in p.stimmen))
   if (fehlt.length) throw new Error(`Es fehlen Stimmen von: ${fehlt.join(', ')}`)
   const erg = auswerten(p.stimmen, p.lebende)
+  const sonderfall = erg.gleichstand && p.regeln.gleichstand !== 'niemand'
+  const zurStichwahl = sonderfall && p.regeln.gleichstand === 'stichwahl' && !p.stichwahl
+  if (!zurStichwahl) p.phase = 'ergebnis'   // vor dem Aufdecken, damit 'zettelwahl' die Phase 'ergebnis' traegt (wie immer)
   // Die Zettel werden aufgedeckt: alle Stimmen auf einmal
   melde(p, 'zettelwahl', { stimmen: { ...p.stimmen } })
-  if (erg.gleichstand && p.regeln.gleichstand !== 'niemand') {
+  if (sonderfall) {
     const hoechste = Math.max(...Object.values(erg.zaehler))
     const gleiche = p.lebende.filter((n) => erg.zaehler[n] === hoechste)
-    if (p.regeln.gleichstand === 'stichwahl' && !p.stichwahl) {
+    if (zurStichwahl) {
       // Zweite Runde nur unter den Gleichen; die Phase bleibt 'abstimmung', alle stimmen noch einmal
       p.stichwahl = gleiche
       p.stimmen = {}
@@ -279,7 +282,6 @@ export function abstimmungSchliessen(p) {
     }
     if (p.regeln.gleichstand === 'los') { erg.eingesperrt = p.zufall.aus(gleiche); erg.los = true }
   }
-  p.phase = 'ergebnis'
   if (erg.eingesperrt) {
     p.lebende = p.lebende.filter((n) => n !== erg.eingesperrt)
     p.keller.push(erg.eingesperrt)

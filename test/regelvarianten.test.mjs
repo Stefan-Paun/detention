@@ -1,4 +1,5 @@
 import { test } from 'node:test'
+import { createHash } from 'node:crypto'
 import assert from 'node:assert/strict'
 import { zufall } from '../spiel/zufall.mjs'
 import * as P from '../spiel/partie.mjs'
@@ -58,6 +59,26 @@ test('Regeln: ohne Abweichung laeuft eine Partie Ereignis fuer Ereignis wie mit 
   }
 })
 
+// Fingerabdruck der Ereignisse von je 40 Partien (Startwerte 1-40), erzeugt auf dem Stand VOR dem Regel-Objekt.
+// Schlaegt das fehl, hat sich das Standardspiel geaendert (Ereignisinhalt, Reihenfolge oder Zufallsverbrauch).
+// Nach einer gewollten Regelaenderung die Werte neu erzeugen und das im Commit sagen.
+const FINGERABDRUCK = {
+  4: '183006298e469409c4e3b375413c707c793e47f90f5ce375cc03080e4d5756e3',
+  5: '22382de7179ce07d2f58959741ffac0d208fb7882ef077d984c037e030d5e1eb',
+  6: '3793835f31b658576b99bc009c957559fe19785f87df4aade68d2d18a32c8192',
+  7: 'a3099edd97e9c564651b3317bb0aaa89d2db1163598949f04e5a9d298224072f',
+  8: '77117dfd9e024286c5252fd0aadb2ab989ebad7a1f2bac612c712cca71a2e801',
+}
+
+test('Regeln: das Standardspiel ist Byte fuer Byte das Spiel von vor dem Regel-Objekt', async () => {
+  const ALLE = [...NAMEN, 'Ben']
+  for (const [n, soll] of Object.entries(FINGERABDRUCK)) {
+    const h = createHash('sha256')
+    for (let s = 1; s <= 40; s++) h.update(JSON.stringify((await spielePartie(s, ALLE.slice(0, Number(n)))).ereignisse))
+    assert.equal(h.digest('hex'), soll, `${n} Figuren`)
+  }
+})
+
 test('Regeln: petze/petzeJede als Option haben Vorrang vor dem Regel-Objekt', () => {
   const p = P.neuePartie(NAMEN, zufall(3), { petze: false, petzeJede: 1, regeln: { petze: true, petzeJede: 3 } })
   assert.equal(P.petze(p), undefined)
@@ -104,6 +125,7 @@ test('Gleichstand im Standard: niemand kommt in den Keller', () => {
   assert.equal(erg.eingesperrt, null)
   assert.equal(p.keller.length, 0)
   assert.equal(p.phase, 'nacht')
+  assert.equal(p.ereignisse.find((e) => e.art === 'zettelwahl').phase, 'ergebnis')
 })
 
 test('Gleichstand mit Stichwahl: zweite Runde nur unter den Gleichen, danach faellt die Entscheidung', () => {
@@ -114,6 +136,7 @@ test('Gleichstand mit Stichwahl: zweite Runde nur unter den Gleichen, danach fae
   const erg = P.abstimmungSchliessen(p)
   assert.deepEqual(erg.stichwahl, [a, b])
   assert.equal(p.phase, 'abstimmung')
+  assert.equal(p.ereignisse.findLast((e) => e.art === 'zettelwahl').phase, 'abstimmung', 'erste Runde: noch kein Ergebnis')
   assert.deepEqual(p.stimmen, {})
   const ansage = p.ereignisse.at(-1)
   assert.equal(ansage.art, 'abstimmung')
@@ -125,6 +148,7 @@ test('Gleichstand mit Stichwahl: zweite Runde nur unter den Gleichen, danach fae
   for (const n of p.lebende) P.stimme(p, n, n === a ? b : a)
   const zweite = P.abstimmungSchliessen(p)
   assert.equal(zweite.eingesperrt, a)
+  assert.equal(p.ereignisse.findLast((e) => e.art === 'zettelwahl').phase, 'ergebnis')
   assert.deepEqual(p.keller, [a])
   assert.equal(p.stichwahl, null, 'die naechste Nacht beginnt ohne Stichwahl')
 })

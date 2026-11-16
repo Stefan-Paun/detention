@@ -21,10 +21,10 @@ Gemessen mit `node tools/labor.mjs` (Standard: 2000 Skript-Partien je Variante, 
 ## Befund
 
 - **Der Standard liegt im Ziel.** 44,1 % und 45,3 % Schattenquote bei 7 Figuren, beide Intervalle ganz im Zielbereich 40–60 % aus `docs/balance-petze.md`. Die Partien dauern im Schnitt 2,2 Nächte, nie länger als 4.
-- **Die Petze ist die einzige Regel, die das Gleichgewicht sicher trägt.** Ohne sie steigt die Schattenquote in beiden Läufen um 6 bis 8 Punkte (Intervalle getrennt). Das bestätigt die Messung in `docs/balance-petze.md`.
+- **Die Petze ist die einzige Regel, die das Gleichgewicht sicher trägt.** Ohne sie steigt die Schattenquote in beiden Läufen um knapp 6 bis 8 Punkte (Intervalle getrennt). Das bestätigt die Messung in `docs/balance-petze.md`.
 - **„Petze jede Nacht“ ist nicht sicher schlechter für den Schatten.** Im ersten Lauf sind die Intervalle getrennt (−4,7 Punkte), im zweiten überlappen sie (−3,2 Punkte). Die Richtung stimmt beide Male, die Größe ist mit 2000 Partien nicht fest. Wer das genau wissen will: `--partien 10000`.
 - **8 Figuren kippen zugunsten der Schüler** (rund 31 %, in beiden Läufen belegt, unter dem Zielbereich). Das ist die bekannte Grundmechanik, keine neue Erkenntnis, aber jetzt mit Intervall.
-- **Gleichstand, Sprechrunden, Untersuchungen, Tagesereignisse: kein belegter Einfluss auf die Siegquote.** Stichwahl und Los verschieben die Quote um weniger als einen Punkt. Ein Grund: Bei Skript-Gehirnen endet nur etwa jede 26. Abstimmung ohne Keller (3,8 %), es gibt also wenig zu entscheiden; in 2000 Partien kam es zu 134 Stichwahlen. Diese Regeln sind damit eine Frage des Spielgefühls, nicht der Balance. Mit Claude-Figuren kann das anders sein (siehe unten).
+- **Gleichstand, Sprechrunden, Untersuchungen, Tagesereignisse: kein belegter Einfluss auf die Siegquote.** Stichwahl und Los verschieben die Quote um weniger als einen Punkt. Ein Grund: Bei Skript-Gehirnen endet nur etwa jede 26. Abstimmung ohne Keller (3,8 %), es gibt also wenig zu entscheiden. **Die Stichwahl ist damit nicht wirklich gemessen:** In 2000 Partien kam es zu 134 Stichwahlen, und 115 davon endeten wieder im Gleichstand, weil die Skript-Gehirne in der zweiten Runde nach denselben Beschuldigungen stimmen wie in der ersten. Nur 19 Stichwahlen haben etwas entschieden. Für „Los“ trägt die Aussage (keine Abstimmung ohne Keller mehr, Quote trotzdem um weniger als einen Punkt verschoben); für die Stichwahl bleibt die Frage offen, bis Gehirne spielen, die in der zweiten Runde neu überlegen.
 - **„Schluss nach Nacht 2“** verkürzt die Partie von 2,2 auf 1,7 Nächte; fast jede zweite Partie (939 von 2000) endet dann durch den Schluss statt durch Einsperren oder Übrigbleiben. Die Schattenquote steigt um etwa 3 Punkte, belegt ist das nicht.
 - **Schlüsselträger:** In 38,5 % der Partien prüft er irgendwann den Schatten; danach gewinnen die Schüler in 62,3 % dieser Partien (gegen 55,9 % insgesamt). Eine „Rettung“ gibt es in Nachsitzen nicht (der Schlüsselträger prüft, er schützt nicht); diese Kennzahl ersetzt sie.
 - **Schatten fliegt in Nacht 1:** 29,3 % im Standard. Bei 7 Figuren wäre reines Raten 1/6 ≈ 16,7 % pro Abstimmung mit Ergebnis; Schlüsselträger und Petze heben das deutlich.
@@ -32,7 +32,7 @@ Gemessen mit `node tools/labor.mjs` (Standard: 2000 Skript-Partien je Variante, 
 
 ## Empfehlung
 
-Die Standardregeln bleiben, wie sie sind. Aus den Daten folgt keine Änderung: Keine der getesteten Varianten bringt die Quote bei 7 Figuren näher an 50 %, ohne etwas anderes zu verschieben. Wer 8 Figuren spielen will, sollte dort die Basis nachjustieren (zum Beispiel mit einer eigenen Variantendatei `{"figuren": 8, "regeln": {"petze": false}}` anfangen und messen).
+Die Standardregeln bleiben, wie sie sind. Aus den Daten folgt keine Änderung: Keine der getesteten Varianten bringt die Quote bei 7 Figuren näher an 50 %, ohne etwas anderes zu verschieben. Wer 8 Figuren spielen will, sollte dort die Basis nachjustieren (zum Beispiel mit der Variantendatei `[{ "name": "8 Figuren", "figuren": 8 }, { "name": "8 ohne Petze", "figuren": 8, "regeln": { "petze": false } }]` anfangen und messen).
 
 ## Was die Zahlen nicht sagen
 
