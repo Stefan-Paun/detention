@@ -91,7 +91,7 @@ test('Server: Spieler-Partie, Eingaben per POST, private Ereignisse bleiben priv
     assert.equal(p.phase, 'ende')
     const alles = ev.filter((e) => e.art === 'ereignis').map((e) => e.daten)
     // Sobald Stefan raus ist, sieht er als Geist alles; privat bleibt nur, was davor kam
-    const raus = alles.findIndex((e) => (e.art === 'verschwunden' || e.art === 'keller') && e.name === 'Stefan')
+    const raus = alles.findIndex((e) => (e.art === 'verschwunden' || e.art === 'eingesperrt') && e.name === 'Stefan')
     const gesehen = raus < 0 ? alles : alles.slice(0, raus)
     if (raus >= 0) assert.ok(alles.slice(raus).some((e) => e.art === 'platz' && e.wer !== 'Stefan') || p.nacht === alles[raus].nacht, 'als Geist sieht er die Plaetze der anderen')
     assert.ok(alles.filter((e) => e.art === 'rolle').every((e) => e.name === 'Stefan'), 'nur die eigene Rolle')
