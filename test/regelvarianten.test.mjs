@@ -59,15 +59,16 @@ test('Regeln: ohne Abweichung laeuft eine Partie Ereignis fuer Ereignis wie mit 
   }
 })
 
-// Fingerabdruck der Ereignisse von je 40 Partien (Startwerte 1-40), erzeugt auf dem Stand VOR dem Regel-Objekt.
+// Fingerabdruck der Ereignisse von je 40 Partien (Startwerte 1-40), erzeugt auf dem Stand VOR dem Regel-Objekt
+// (neu berechnet am 17.11.2026 nach detention#24 auf origin/main cfd179c: Skript-Gehirne mit Spurentafel).
 // Schlaegt das fehl, hat sich das Standardspiel geaendert (Ereignisinhalt, Reihenfolge oder Zufallsverbrauch).
 // Nach einer gewollten Regelaenderung die Werte neu erzeugen und das im Commit sagen.
 const FINGERABDRUCK = {
-  4: '183006298e469409c4e3b375413c707c793e47f90f5ce375cc03080e4d5756e3',
-  5: '22382de7179ce07d2f58959741ffac0d208fb7882ef077d984c037e030d5e1eb',
-  6: '3793835f31b658576b99bc009c957559fe19785f87df4aade68d2d18a32c8192',
-  7: 'a3099edd97e9c564651b3317bb0aaa89d2db1163598949f04e5a9d298224072f',
-  8: '77117dfd9e024286c5252fd0aadb2ab989ebad7a1f2bac612c712cca71a2e801',
+  4: 'e13c150be2299d812819736258d95f83d3fcbd831b57b35996edeafd99595981',
+  5: 'f554b4d7ee680984fb50a06448932f1be53735a5299c6182c225b405f29775fb',
+  6: '4e07e2e6e9cecda8093ef7d538432fff05b6da2b8410837c22ca9bed58ec5191',
+  7: 'd67e7817b242dcc3768bf3f55418fbcded76aa68ce56bac01c7ac6adb81dcc90',
+  8: 'a980978f108131f3a81ce5b8417fa4c6ff42565289809a2f386d84c22c588db2',
 }
 
 test('Regeln: das Standardspiel ist Byte fuer Byte das Spiel von vor dem Regel-Objekt', async () => {

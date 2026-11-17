@@ -21,10 +21,14 @@
   <button class="knopf leise" id="neu" hidden>Neue Partie</button>
 </header>
 
+<div class="demobanner" id="demobanner" role="note" hidden>
+  <b>Demo mit Skript-Figuren.</b> Die Mitschüler hier sind kleine Programme mit festen Regeln, keine KI. Alles läuft in deinem Browser, ohne Server und ohne Schlüssel. Die echten KI-Figuren gibt es, wenn du das Spiel <a href="https://github.com/Stefan-Paun/detention#readme" rel="noopener">selbst startest</a>.
+</div>
+
 <main class="buehne">
   <section class="start" id="start">
     <h1>Nachts in der Schule.<br>Sieben Pulte, eine Lampe.</h1>
-    <p>Sechs Mitschüler, die wirklich reden, lügen und abstimmen. Einer von euch ist <b>der Schatten</b>. Vielleicht du.</p>
+    <p id="werbung">Sechs Mitschüler, die wirklich reden, lügen und abstimmen. Einer von euch ist <b>der Schatten</b>. Vielleicht du.</p>
     <p>Nachts stellt sich jeder an einen von vier Plätzen. Der Schatten schleicht zu seinem Opfer und hinterlässt Spuren. Am Morgen zählt, wer was gesehen hat und wer über seinen Platz lügt.</p>
     <form id="startform">
       <label>Dein Name <input id="name" placeholder="z. B. Alex" maxlength="20" autocomplete="off" required></label>
@@ -39,7 +43,8 @@
         <button class="knopf leise" type="button" id="zuschauen">Nur zuschauen</button>
       </div>
     </form>
-    <p class="klein">Jede Partie kostet ein paar Cent an KI-Aufrufen. Läuft nur auf diesem Rechner.</p>
+    <p class="klein" id="kostenhinweis">Jede Partie kostet ein paar Cent an KI-Aufrufen. Läuft nur auf diesem Rechner.</p>
+    <p class="klein recht" id="recht" hidden><a href="https://stefanpaun.page/impressum.html">Impressum</a> · <a href="https://stefanpaun.page/datenschutz.html">Datenschutz</a></p>
   </section>
 
   <section class="editor" id="editor" hidden aria-label="Figuren-Editor">

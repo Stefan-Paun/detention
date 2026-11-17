@@ -19,12 +19,14 @@ import { ORT_NAMEN, KLASSENBUCH } from './spiel/welt.mjs'
 import { hefteSpeicher } from './spiel/hefte.mjs'
 import { figurenSpeicher } from './spiel/figurenspeicher.mjs'
 import { pruefeFigur, kennung, MAX_EIGENE, GRENZEN } from './spiel/figurenschema.mjs'
+import { browserModule } from './tools/seite.mjs'
 
 const HIER = path.dirname(fileURLToPath(import.meta.url))
+let browserDateien = null   // Set der Module aus spiel/, die der Browser laden darf (tools/seite.mjs)
 const OEFFENTLICH = path.join(HIER, 'public')
-export const KI_FIGUREN = ['Mira', 'Jonas', 'Lea', 'Tarik', 'Nora', 'Sam']
-const ZUSCHAUER_ERSATZ = 'Ben'   // nimmt den Platz des Menschen ein, wenn nur zugeschaut wird
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png' }
+import { pruefeName, KI_FIGUREN, ZUSCHAUER_ERSATZ } from './spiel/name.mjs'
+export { pruefeName, KI_FIGUREN }
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png' }
 
 // Port aus der Umgebung: leer -> 4800, sonst ganze Zahl 0-65535, alles andere wirft eine deutsche Meldung.
 export function pruefePort(wert) {
@@ -32,18 +34,6 @@ export function pruefePort(wert) {
   const n = Number(wert)
   if (!Number.isInteger(n) || n < 0 || n > 65535) throw new Error(`Ungültiger Port „${wert}“ – NACHSITZEN_PORT muss eine Zahl von 0 bis 65535 sein`)
   return n
-}
-
-// Spielername: 1-20 Zeichen ohne Steuerzeichen und <>, kein Wort, das im Spiel schon etwas bedeutet.
-// Leer ist erlaubt (Standardname „Du“); gibt den bereinigten Namen zurück oder wirft.
-export function pruefeName(roh) {
-  const name = String(roh ?? '').replace(/\s+/g, ' ').trim()
-  if (!name) return 'Du'
-  if (name.length > 20) throw new Error('Der Name darf höchstens 20 Zeichen lang sein')
-  if (/[\p{Cc}\p{Cf}<>]/u.test(name)) throw new Error('Der Name enthält unerlaubte Zeichen (<, > oder Steuerzeichen)')
-  const reserviert = ['niemand', 'alle', 'du', ZUSCHAUER_ERSATZ, KLASSENBUCH, ...ORT_NAMEN].map((w) => w.toLowerCase())
-  if (reserviert.includes(name.toLowerCase())) throw new Error(`Der Name „${name}“ ist im Spiel schon belegt – wähle einen anderen`)
-  return name
 }
 
 export const MAX_KI = 7, MIN_KI = 3   // plus Mensch oder Ben: 4 bis 8 Figuren wie in rollen.mjs
@@ -245,6 +235,13 @@ export function erstelleServer({ gehirnFabrik, hefte = null, figuren: eigene = n
       }
       if (req.method === 'GET' && url.pathname === '/status') {
         res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(status()))
+        return
+      }
+      if (req.method === 'GET' && url.pathname.startsWith('/spiel/')) {
+        // Nur die Spielregeln, die die Browser-Demo (public/lokal.js, ?demo=1) importiert; nichts mit Dateien oder Schluesseln
+        const rel = url.pathname.slice(1)
+        if (!(browserDateien ??= new Set(browserModule())).has(rel)) { res.writeHead(404).end('nicht gefunden'); return }
+        res.writeHead(200, { 'content-type': MIME['.js'] }).end(fs.readFileSync(path.join(HIER, rel)))
         return
       }
       if (req.method === 'GET') {
