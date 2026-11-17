@@ -9,7 +9,9 @@ import { farbeFuer } from './besetzung.js'
 const $ = (id) => document.getElementById(id)
 // Demo ohne Server: auf GitHub Pages (jeder Host ausser localhost) oder mit ?demo=1. Dann spielt
 // public/lokal.js die Partie im Browser mit Skript-Figuren: kein fetch, kein EventSource, kein Schluessel.
-const DEMO = new URLSearchParams(location.search).get('demo') === '1' || !/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)
+// ?demo=0 erzwingt den echten Server (z. B. Aufruf ueber LAN-IP oder Tailscale).
+const DEMO_PARAM = new URLSearchParams(location.search).get('demo')
+const DEMO = DEMO_PARAM === '1' || (DEMO_PARAM !== '0' && !/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname))
 let leiter = null   // lokaler Spielleiter (nur Demo)
 const ROLLE = { schatten: 'der Schatten', schluessel: 'der Schlüsselträger', petze: 'die Petze', schueler: 'ein normaler Schüler' }
 const ROLLE_ERKLAERT = {

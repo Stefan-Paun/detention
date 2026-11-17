@@ -12,7 +12,7 @@ Ein Spiel im Stil von Werwolf, nur dass die Mitspieler Claude-Figuren sind: Jede
 
 **[stefanpaun.page/detention](https://stefanpaun.page/detention/)** spielt eine Partie direkt im Browser, ohne Server, ohne Anmeldung, ohne Schlüssel und ohne Kosten. Ehrlich gesagt: Dort spielen **Skript-Figuren**, keine KI. Sie folgen festen Regeln: Sie nennen ihren Platz, geben weiter, was sie nachts gesehen haben, halten Behauptungen gegen Beobachtungen („Mira, du sagst Fenster, aber du warst bei den Pulten“), und der Schatten lügt. Regeln, Spuren, Spurentafel und Pixel-Klassenzimmer sind dieselben wie im echten Spiel. Die Demo schickt nichts weg; gespeichert werden nur deine Einstellungen (Ton, Schrecken, Dämmerung) im Browser.
 
-Lokal geht dieselbe Demo mit `npm start` und `http://localhost:4800/?demo=1`.
+Lokal geht dieselbe Demo mit `npm start` und `http://localhost:4800/?demo=1`. Über LAN-IP oder Tailscale erzwingt `?demo=0` den echten Server.
 
 *Browser demo: play in the browser against scripted characters (not AI), no server, no key, nothing sent anywhere.*
 
