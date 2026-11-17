@@ -7,7 +7,8 @@
 //                                    Petze: ziel = wessen Rolle sie erfahren will; merkePetze(ziel, rolle) ist optional)
 //   untersuchen -> { ort } | null    (Ort oder 'Klassenbuch', einmal pro Tag, nur Runde 1)
 //   zeigen -> boolean                (optional: das eigene Untersuchungsergebnis allen vorzeigen)
-//   abstimmung -> { fuer }           (geheim; Stimmen werden erst am Ende aufgedeckt)
+//   abstimmung -> { fuer }           (geheim; Stimmen werden erst am Ende aufgedeckt; extra.kandidaten nur in einer
+//                                    Stichwahl, Regel gleichstand = 'stichwahl': wer dann jemand anderen nennt, enthaelt sich)
 
 import * as P from './partie.mjs'
 import { ORT_NAMEN, KLASSENBUCH, behauptungAus } from './welt.mjs'
@@ -78,8 +79,10 @@ export async function spieleBisZumEnde(p, gehirne, { zufall, beobachter = () => 
     }
     if (p.phase === 'abstimmung') {
       for (const n of zufall.mischen(p.lebende)) {
-        const a = await gehirne[n].abstimmung(sicht(n), p.lebende)
-        P.stimme(p, n, a.fuer ?? null); melde()
+        const kandidaten = p.stichwahl
+        const a = await (kandidaten ? gehirne[n].abstimmung(sicht(n), p.lebende, { kandidaten: [...kandidaten] }) : gehirne[n].abstimmung(sicht(n), p.lebende))
+        const fuer = a.fuer ?? null
+        P.stimme(p, n, kandidaten && !kandidaten.includes(fuer) ? null : fuer); melde()
       }
       P.abstimmungSchliessen(p); melde()
     }

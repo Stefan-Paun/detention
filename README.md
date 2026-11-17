@@ -112,11 +112,35 @@ Die Hefte liegen außerhalb des Repos unter `~/.local/share/nachsitzen/hefte/`. 
 npm test                          # Tests ohne Netz: Regeln, Welt, Gehirn mit Fake-API, Server, Simulation, Petze (Sichtbarkeit, Balance), Figuren-Editor
 npm run simuliere                 # 100 Partien mit Skript-Gehirnen, Siegquoten
 node tools/balance.mjs 2000 1     # Schatten-Siegquote für 4–8 Figuren, mit und ohne Petze
+npm run labor                     # Balance-Labor: Regelvarianten in je 2000 Skript-Partien, Tabelle + HTML-Bericht
 npm run spiele -- --zuschauen     # eine echte Partie im Terminal (kostet Cent)
 node tools/seite.mjs _site        # statische Browser-Demo bauen (wie der Pages-Workflow)
 ```
 
-Aufbau: `spiel/partie.mjs` (Regeln; jedes Ereignis weiß, wer es sehen darf), `spiel/welt.mjs` (die Wahrheit hinter dem Gerede: Plätze, Spuren, Beobachtungen), `spiel/gehirn.mjs` (Claude-Figur mit eigenem Kontext und Werkzeug-Aufrufen), `spiel/hefte.mjs` (Erinnerung), `spiel/figurenschema.mjs` / `spiel/figurenspeicher.mjs` / `spiel/figurentext.mjs` (eigene Figuren: Prüfung, Ablage, Prompt-Bereinigung), `spiel/spurentafel.mjs` (die Spurentafel als Text für Terminal und `zug.mjs --tafel`), `spiel/skriptgehirne.mjs` (Skript-Figuren für Tests, Simulation und Demo), `server.mjs` (lokaler Server, SSE), `public/` (Browser, Pixelszene), `public/lokal.js` (Spielleiter im Browser für die Demo). Was im Browser läuft, darf nichts aus `node:` importieren; `tools/seite.mjs` prüft das beim Bauen. Der Plan mit allen Entscheidungen: [docs/PLAN.md](docs/PLAN.md).
+Aufbau: `spiel/partie.mjs` (Regeln; jedes Ereignis weiß, wer es sehen darf), `spiel/regeln.mjs` (die Stellschrauben als ein Objekt, Standard = heutiges Spiel), `spiel/welt.mjs` (die Wahrheit hinter dem Gerede: Plätze, Spuren, Beobachtungen), `spiel/gehirn.mjs` (Claude-Figur mit eigenem Kontext und Werkzeug-Aufrufen), `spiel/hefte.mjs` (Erinnerung), `spiel/figurenschema.mjs` / `spiel/figurenspeicher.mjs` / `spiel/figurentext.mjs` (eigene Figuren: Prüfung, Ablage, Prompt-Bereinigung), `spiel/spurentafel.mjs` (die Spurentafel als Text für Terminal und `zug.mjs --tafel`), `spiel/skriptgehirne.mjs` (Skript-Figuren für Tests, Simulation und Demo), `server.mjs` (lokaler Server, SSE), `public/` (Browser, Pixelszene), `public/lokal.js` (Spielleiter im Browser für die Demo). Was im Browser läuft, darf nichts aus `node:` importieren; `tools/seite.mjs` prüft das beim Bauen. Der Plan mit allen Entscheidungen: [docs/PLAN.md](docs/PLAN.md).
+
+### Balance-Labor
+
+Regeländerungen lassen sich messen, bevor sie ins Spiel kommen. `npm run labor` spielt jede Variante mit Skript-Gehirnen (kein Netz, keine Kosten, ein paar Sekunden) und zeigt Siegquoten, Partielänge, wie oft der Schatten gleich in Nacht 1 fliegt und wie oft der Schlüsselträger ihn findet. Jede Quote hat ein Wilson-Intervall (95 %); ein Unterschied zur ersten Variante gilt nur als belegt, wenn sich die Intervalle nicht überlappen.
+
+```
+npm run labor                                             # eingebaute Varianten, Bericht nach ausgabe/labor.html
+npm run labor -- --partien 5000 --startwert 2001          # mehr Partien, andere Startwerte
+npm run labor -- --varianten meine.json --aus bericht.html
+npm run labor -- --kein-html                              # nur die Tabelle im Terminal
+```
+
+Eine Variantendatei ist eine Liste; die erste Zeile ist die Basis:
+
+```json
+[
+  { "name": "Standard" },
+  { "name": "Stichwahl, drei Runden", "regeln": { "gleichstand": "stichwahl", "sprechrunden": 3 } },
+  { "name": "8 ohne Petze", "figuren": 8, "regeln": { "petze": false }, "schattenStrategie": "zufall" }
+]
+```
+
+Die Regeln mit ihren Standardwerten stehen in `spiel/regeln.mjs`: `petze`, `petzeAb`, `petzeJede`, `sprechrunden`, `maxUntersuchungen`, `gleichstand` (`niemand`, `stichwahl`, `los`), `schlussNacht`, `tagesereignisse`. Das Spiel selbst läuft immer mit dem Standard; Abweichungen gibt es nur im Labor. Gleicher Startwert ergibt exakt denselben Bericht (er enthält kein Datum). Der Bericht ist eine einzelne HTML-Datei ohne externe Verweise. Was das Labor über die aktuellen Regeln sagt: [docs/balance-labor.md](docs/balance-labor.md).
 
 Harte Grenzen für die Figuren stehen in `prompts/system.md`: Tinte statt Blut, nichts zu Selbstverletzung, nichts Sexuelles, keine echten Personen. Gruselig darf es sein, grausam nicht.
 

@@ -3,22 +3,27 @@
 // den Gespraechsverlauf jeder einzelnen Figur (jede hat ihren eigenen Kontext).
 // Seit M2.5 gibt es eine echte Nacht: Plaetze, Beobachtungen, Funde, Untersuchungen, Tagesereignisse.
 
+import { STANDARD_REGELN, regelnMit } from './regeln.mjs'
 import { verteileRollen, SCHATTEN, SCHLUESSEL, PETZE } from './rollen.mjs'
 import { pultText } from './figurentext.mjs'
 import { auswerten } from './abstimmung.mjs'
 import { ORT_NAMEN, KLASSENBUCH, istOrt, beobachtungen, funde, tagesereignis, untersuchung, opferSatz } from './welt.mjs'
 
 export const PHASEN = ['abend', 'nacht', 'morgen', 'diskussion', 'abstimmung', 'ergebnis', 'ende']
-export const SPRECHRUNDEN = 2        // Diskussionsrunden pro Tag (Hausmeister: 1)
+export const SPRECHRUNDEN = STANDARD_REGELN.sprechrunden        // Diskussionsrunden pro Tag (Hausmeister: 1)
 export const MAX_NAECHTE = 10        // Notbremse gegen Endlosschleifen
-export const PETZE_JEDE = 2         // die Petze erfaehrt nur jede n-te Nacht etwas (1 = jede Nacht; Balance, siehe docs/balance-petze.md)
-export const MAX_UNTERSUCHUNGEN = 3  // pro Figur und Partie (sonst ist die Wahrheit zu billig)
+export const PETZE_JEDE = STANDARD_REGELN.petzeJede         // die Petze erfaehrt nur jede n-te Nacht etwas (1 = jede Nacht; Balance, siehe docs/balance-petze.md)
+export const MAX_UNTERSUCHUNGEN = STANDARD_REGELN.maxUntersuchungen  // pro Figur und Partie (sonst ist die Wahrheit zu billig)
 
-export function neuePartie(namen, zufall, { spieler = null, petze = null, petzeJede = PETZE_JEDE } = {}) {
-  const rollen = verteileRollen(namen, zufall, { petze })
+// `regeln`: Abweichungen vom Standard (spiel/regeln.mjs), nur fuer Labor und Tests. `petze`/`petzeJede`
+// direkt in den Optionen gehen wie bisher und haben Vorrang (neu: petzeJede wird wie jede Regel geprueft, 1 bis 10).
+export function neuePartie(namen, zufall, { spieler = null, petze = null, petzeJede, regeln = null } = {}) {
+  const r = regelnMit({ ...regeln, ...(petze != null ? { petze } : {}), ...(petzeJede != null ? { petzeJede } : {}) })
+  const rollen = verteileRollen(namen, zufall, { petze: r.petze, petzeAb: r.petzeAb })
   const p = {
     namen: [...namen],
     spieler,                          // Name der menschlichen Figur (oder null = nur KI)
+    regeln: r,                        // eingefroren; Standard = STANDARD_REGELN
     rollen,
     lebende: [...namen],
     keller: [],                       // eingesperrt (Rolle oeffentlich bekannt)
@@ -26,11 +31,11 @@ export function neuePartie(namen, zufall, { spieler = null, petze = null, petzeJ
     phase: 'abend',
     nacht: 0,
     runde: 0,                         // Sprechrunde innerhalb der Diskussion
-    rundenHeute: SPRECHRUNDEN,
+    rundenHeute: r.sprechrunden,
     plaetze: {},                      // Nacht: name -> Ort
     nachtwahl: null,                  // Ziel des Schattens in dieser Nacht
     pruefung: null,                   // { wer, ziel, rolle } des Schluesseltraegers
-    petzeJede,                        // Rhythmus der Petze (Nacht 1, 1+n, 1+2n ...)
+    petzeJede: r.petzeJede,           // Rhythmus der Petze (Nacht 1, 1+n, 1+2n ...)
     petzeWahl: null,                  // { wer, ziel, rolle } der Petze in dieser Nacht (privat)
     letzteNacht: null,                // { plaetze, schatten, opfer } fuer Untersuchungen am Tag
     naechte: [],                      // alle Naechte, fuer die Wahrheit am Ende
@@ -42,6 +47,7 @@ export function neuePartie(namen, zufall, { spieler = null, petze = null, petzeJ
     vorgezeigt: [],                   // wer heute schon einen Beweis vorgezeigt hat
     offeneAbstimmung: false,          // Standard: geheim; die Glocke macht sie offen
     stimmen: {},
+    stichwahl: null,                  // Namen, die in der Stichwahl stehen (nur mit Regel gleichstand = 'stichwahl')
     ereignisse: [],
     sieger: null,                     // 'schueler' | 'schatten' | null
     zufall,
@@ -107,7 +113,8 @@ function nachtBeginnen(p) {
   p.ergebnisse = {}
   p.vorgezeigt = []
   p.offeneAbstimmung = false
-  p.rundenHeute = SPRECHRUNDEN
+  p.stichwahl = null
+  p.rundenHeute = p.regeln.sprechrunden
   melde(p, 'nacht', { text: 'Die Lampe erlischt. Jeder sucht sich einen Platz.' })
   if (p.nacht > MAX_NAECHTE) throw new Error('Zu viele Nächte - Spiellogik hängt')
 }
@@ -189,7 +196,7 @@ export function morgen(p) {
   melde(p, 'verschwunden', { name: opfer, ort: nacht.plaetze[opfer], text: opferSatz(opfer, nacht.plaetze[opfer], p.zufall) })
   if (siegPruefen(p)) return
   for (const f of funde({ ...nacht, zufall: p.zufall })) melde(p, 'fund', f)
-  const ereignis = tagesereignis({ ...nacht, zufall: p.zufall })
+  const ereignis = p.regeln.tagesereignisse ? tagesereignis({ ...nacht, zufall: p.zufall }) : null
   if (ereignis) {
     const { art, ...rest } = ereignis
     melde(p, art, rest)
@@ -203,14 +210,14 @@ export function morgen(p) {
 
 // --- Tag: untersuchen, reden, abstimmen -------------------------------------------------
 
-export function untersuchungenUebrig(p, wer) { return Math.max(0, MAX_UNTERSUCHUNGEN - (p.untersuchungen[wer] || 0)) }
+export function untersuchungenUebrig(p, wer) { return Math.max(0, p.regeln.maxUntersuchungen - (p.untersuchungen[wer] || 0)) }
 
 // Einmal pro Tag, hoechstens dreimal pro Partie, darf jede Figur einen Ort oder das Klassenbuch untersuchen.
 export function untersuchen(p, wer, ort) {
   pruefePhase(p, 'diskussion')
   if (!lebt(p, wer)) throw new Error(`${wer} ist nicht im Raum`)
   if (p.untersucht.includes(wer)) throw new Error(`${wer} hat heute schon untersucht`)
-  if (!untersuchungenUebrig(p, wer)) throw new Error(`${wer} hat in dieser Partie schon ${MAX_UNTERSUCHUNGEN}-mal untersucht`)
+  if (!untersuchungenUebrig(p, wer)) throw new Error(`${wer} hat in dieser Partie schon ${p.regeln.maxUntersuchungen}-mal untersucht`)
   p.untersuchungen[wer] = (p.untersuchungen[wer] || 0) + 1
   if (ort !== KLASSENBUCH && !istOrt(ort)) throw new Error(`Kein Ort: ${ort}`)
   p.untersucht.push(wer)
@@ -248,6 +255,7 @@ export function stimme(p, von, fuer) {
   pruefePhase(p, 'abstimmung')
   if (!lebt(p, von)) throw new Error(`${von} ist nicht im Raum`)
   if (fuer != null && (!lebt(p, fuer) || fuer === von)) throw new Error(`Ungültige Stimme von ${von} für ${fuer}`)
+  if (fuer != null && p.stichwahl && !p.stichwahl.includes(fuer)) throw new Error(`${fuer} steht nicht in der Stichwahl`)
   p.stimmen[von] = fuer
   melde(p, 'stimme', { von, fuer }, p.offeneAbstimmung ? [...p.lebende] : [von])   // geheim: nur der Waehler sieht seinen Zettel
 }
@@ -257,30 +265,47 @@ export function abstimmungSchliessen(p) {
   const fehlt = p.lebende.filter((n) => !(n in p.stimmen))
   if (fehlt.length) throw new Error(`Es fehlen Stimmen von: ${fehlt.join(', ')}`)
   const erg = auswerten(p.stimmen, p.lebende)
-  p.phase = 'ergebnis'
+  const sonderfall = erg.gleichstand && p.regeln.gleichstand !== 'niemand'
+  const zurStichwahl = sonderfall && p.regeln.gleichstand === 'stichwahl' && !p.stichwahl
+  if (!zurStichwahl) p.phase = 'ergebnis'   // vor dem Aufdecken, damit 'zettelwahl' die Phase 'ergebnis' traegt (wie immer)
   // Die Zettel werden aufgedeckt: alle Stimmen auf einmal
   melde(p, 'zettelwahl', { stimmen: { ...p.stimmen } })
+  if (sonderfall) {
+    const hoechste = Math.max(...Object.values(erg.zaehler))
+    const gleiche = p.lebende.filter((n) => erg.zaehler[n] === hoechste)
+    if (zurStichwahl) {
+      // Zweite Runde nur unter den Gleichen; die Phase bleibt 'abstimmung', alle stimmen noch einmal
+      p.stichwahl = gleiche
+      p.stimmen = {}
+      melde(p, 'abstimmung', { text: `Gleichstand zwischen ${gleiche.join(' und ')}. Stichwahl: Jeder stimmt noch einmal, nur für einen dieser Namen.`, offen: p.offeneAbstimmung, stichwahl: [...gleiche] })
+      return { ...erg, stichwahl: [...gleiche] }
+    }
+    if (p.regeln.gleichstand === 'los') { erg.eingesperrt = p.zufall.aus(gleiche); erg.los = true }
+  }
   if (erg.eingesperrt) {
     p.lebende = p.lebende.filter((n) => n !== erg.eingesperrt)
     p.keller.push(erg.eingesperrt)
-    melde(p, 'eingesperrt', { name: erg.eingesperrt, rolle: p.rollen[erg.eingesperrt], zaehler: erg.zaehler })
+    melde(p, 'eingesperrt', { name: erg.eingesperrt, rolle: p.rollen[erg.eingesperrt], zaehler: erg.zaehler, ...(erg.los ? { los: true } : {}) })
   } else {
     melde(p, 'niemand', { gleichstand: erg.gleichstand, zaehler: erg.zaehler })
   }
-  if (siegPruefen(p)) return erg
+  if (siegPruefen(p, { nachAbstimmung: true })) return erg
   nachtBeginnen(p)
   return erg
 }
 
 // --- Sieg ------------------------------------------------------------------------------
 
-function siegPruefen(p) {
+function siegPruefen(p, { nachAbstimmung = false } = {}) {
   const s = schatten(p)
+  let grund = null
   if (!lebt(p, s)) p.sieger = 'schueler'
   else if (p.lebende.length <= 2) p.sieger = 'schatten'
+  // Regel schlussNacht: nach der letzten Abstimmung geht die Tuer auf, der Schatten ist entkommen
+  else if (nachAbstimmung && p.regeln.schlussNacht && p.nacht >= p.regeln.schlussNacht) { p.sieger = 'schatten'; grund = 'schluss' }
   if (!p.sieger) return false
   p.phase = 'ende'
-  melde(p, 'ende', { sieger: p.sieger, schatten: s })
+  melde(p, 'ende', { sieger: p.sieger, schatten: s, ...(grund ? { grund } : {}) })
   // Die Wahrheit: alle Rollen und wer in welcher Nacht wo stand
   melde(p, 'wahrheit', { rollen: { ...p.rollen }, naechte: p.naechte.map((n) => ({ nacht: n.nacht, plaetze: { ...n.plaetze }, schatten: n.schatten, opfer: n.opfer, verwischt: !!n.verwischt })) })
   return true

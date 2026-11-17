@@ -11,6 +11,7 @@
     "start": "node server.mjs",
     "test": "node --test test/*.test.mjs",
     "simuliere": "node tools/simuliere.mjs",
+    "labor": "node tools/labor.mjs",
     "spiele": "node tools/spiele.mjs",
     "kosten": "node tools/kosten.mjs"
   },

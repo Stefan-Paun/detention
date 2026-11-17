@@ -10,12 +10,13 @@ import { skriptGehirn } from './skriptgehirne.mjs'
 
 export const FIGUREN = ['Mira', 'Jonas', 'Lea', 'Tarik', 'Nora', 'Sam', 'Stefan']
 
-// petze: null = Standard (ab PETZE_AB Figuren), true/false erzwingt die Rolle an/aus
-export async function spielePartie(startwert, namen = FIGUREN, { petze = null, petzeJede = P.PETZE_JEDE } = {}) {
+// petze: null = Standard (ab PETZE_AB Figuren), true/false erzwingt die Rolle an/aus.
+// regeln: Abweichungen von den Standardregeln (spiel/regeln.mjs), schattenStrategie: siehe tools/skriptgehirne.mjs.
+export async function spielePartie(startwert, namen = FIGUREN, { petze = null, petzeJede, regeln = null, schattenStrategie = 'lauteste' } = {}) {
   const z = zufall(startwert)
-  const p = P.neuePartie(namen, z, { petze, petzeJede })
+  const p = P.neuePartie(namen, z, { petze, petzeJede, regeln })
   const mitPetze = !!P.petze(p)
-  const gehirne = Object.fromEntries(namen.map((n) => [n, skriptGehirn(n, p.rollen[n], z, { mitPetze })]))
+  const gehirne = Object.fromEntries(namen.map((n) => [n, skriptGehirn(n, p.rollen[n], z, { mitPetze, schattenStrategie })]))
   return spieleBisZumEnde(p, gehirne, { zufall: z })
 }
 
