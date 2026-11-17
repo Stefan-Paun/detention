@@ -18,6 +18,7 @@ Werwolf-artiges Spiel: Stefan + sechs Claude-Figuren (Mira, Jonas, Lea, Tarik, N
 - `spiel/claude.mjs`: Messages-API per fetch. Haiku 5.5: kein Prefill, keine temperature, `thinking: disabled` + `effort: low`, Refusal ist HTTP 200. Nullable Enums als `anyOf`, nicht `type: [..., 'null']`; bei `strict: true` kein `minimum`/`maximum`, stattdessen `enum`.
 - `spiel/kosten.mjs`: Tageszähler mit Deckel. `spiel/schleife.mjs`: eine Schleife für alle Gehirne.
 - `spiel/spurentafel.mjs`: Spurentafel als Text (Terminal, `zug.mjs --tafel`); gleiche Logik wie `merke`/`zeigeTafel` in `public/app.js`. Private Nacht-Ereignisse (`platz`, `schatten-waehlt`, `pruefung`, `ergebnis`) tragen `wer`; Zuschauer und Geister sehen sie mit Namen, Figuren nur die eigenen.
+- Browser-Demo: `public/lokal.js` spielt ohne Server mit `spiel/skriptgehirne.mjs` (auf Pages oder `?demo=1`). Alles, was `public/*.js` importiert, muss ohne `node:` auskommen; `tools/seite.mjs` baut `_site/` und bricht sonst ab. `tools/skriptgehirne.mjs` ist nur noch ein Re-Export.
 - `spiel/hefte.mjs`: Erinnerung über Partien (JSON je Figur unter `~/.local/share/nachsitzen/hefte/`). Die Hefte enthalten Urteile über Stefan; nie in Logs, Commits oder Screenshots.
 
 ## Regeln

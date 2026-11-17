@@ -8,6 +8,14 @@ Ein Spiel im Stil von Werwolf, nur dass die Mitspieler Claude-Figuren sind: Jede
 
 *English in one paragraph: a social-deduction game (think Werewolf) where the other six players are Claude characters with separate hidden knowledge, real night-time evidence (ink trails, chalk dust, witnesses), and a notebook that carries grudges and trust across games. German only for now. You run it locally with your own Anthropic API key; a game costs a few cents.*
 
+## Ausprobieren ohne Schlüssel: die Browser-Demo
+
+**[stefanpaun.page/detention](https://stefanpaun.page/detention/)** spielt eine Partie direkt im Browser, ohne Server, ohne Anmeldung, ohne Schlüssel und ohne Kosten. Ehrlich gesagt: Dort spielen **Skript-Figuren**, keine KI. Sie folgen festen Regeln: Sie nennen ihren Platz, geben weiter, was sie nachts gesehen haben, halten Behauptungen gegen Beobachtungen („Mira, du sagst Fenster, aber du warst bei den Pulten“), und der Schatten lügt. Regeln, Spuren, Spurentafel und Pixel-Klassenzimmer sind dieselben wie im echten Spiel. Die Demo schickt nichts weg; gespeichert werden nur deine Einstellungen (Ton, Schrecken, Dämmerung) im Browser.
+
+Lokal geht dieselbe Demo mit `npm start` und `http://localhost:4800/?demo=1`. Über LAN-IP oder Tailscale erzwingt `?demo=0` den echten Server.
+
+*Browser demo: play in the browser against scripted characters (not AI), no server, no key, nothing sent anywhere.*
+
 ## Spielen mit deiner eigenen KI
 
 Nachsitzen läuft nur auf deinem Rechner. Die Figuren denken mit Claude; dafür brauchst du einen **eigenen API-Schlüssel von Anthropic**. Es gibt keinen Server von mir, keine Anmeldung, nichts wird irgendwohin geschickt außer an die Claude-API.
@@ -105,9 +113,10 @@ npm test                          # Tests ohne Netz: Regeln, Welt, Gehirn mit Fa
 npm run simuliere                 # 100 Partien mit Skript-Gehirnen, Siegquoten
 node tools/balance.mjs 2000 1     # Schatten-Siegquote für 4–8 Figuren, mit und ohne Petze
 npm run spiele -- --zuschauen     # eine echte Partie im Terminal (kostet Cent)
+node tools/seite.mjs _site        # statische Browser-Demo bauen (wie der Pages-Workflow)
 ```
 
-Aufbau: `spiel/partie.mjs` (Regeln; jedes Ereignis weiß, wer es sehen darf), `spiel/welt.mjs` (die Wahrheit hinter dem Gerede: Plätze, Spuren, Beobachtungen), `spiel/gehirn.mjs` (Claude-Figur mit eigenem Kontext und Werkzeug-Aufrufen), `spiel/hefte.mjs` (Erinnerung), `spiel/figurenschema.mjs` / `spiel/figurenspeicher.mjs` / `spiel/figurentext.mjs` (eigene Figuren: Prüfung, Ablage, Prompt-Bereinigung), `spiel/spurentafel.mjs` (die Spurentafel als Text für Terminal und `zug.mjs --tafel`), `server.mjs` (lokaler Server, SSE), `public/` (Browser, Pixelszene). Der Plan mit allen Entscheidungen: [docs/PLAN.md](docs/PLAN.md).
+Aufbau: `spiel/partie.mjs` (Regeln; jedes Ereignis weiß, wer es sehen darf), `spiel/welt.mjs` (die Wahrheit hinter dem Gerede: Plätze, Spuren, Beobachtungen), `spiel/gehirn.mjs` (Claude-Figur mit eigenem Kontext und Werkzeug-Aufrufen), `spiel/hefte.mjs` (Erinnerung), `spiel/figurenschema.mjs` / `spiel/figurenspeicher.mjs` / `spiel/figurentext.mjs` (eigene Figuren: Prüfung, Ablage, Prompt-Bereinigung), `spiel/spurentafel.mjs` (die Spurentafel als Text für Terminal und `zug.mjs --tafel`), `spiel/skriptgehirne.mjs` (Skript-Figuren für Tests, Simulation und Demo), `server.mjs` (lokaler Server, SSE), `public/` (Browser, Pixelszene), `public/lokal.js` (Spielleiter im Browser für die Demo). Was im Browser läuft, darf nichts aus `node:` importieren; `tools/seite.mjs` prüft das beim Bauen. Der Plan mit allen Entscheidungen: [docs/PLAN.md](docs/PLAN.md).
 
 Harte Grenzen für die Figuren stehen in `prompts/system.md`: Tinte statt Blut, nichts zu Selbstverletzung, nichts Sexuelles, keine echten Personen. Gruselig darf es sein, grausam nicht.
 

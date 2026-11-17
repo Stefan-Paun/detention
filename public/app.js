@@ -7,6 +7,12 @@ import { starteEditor, besetzung } from './editor.js'
 import { farbeFuer } from './besetzung.js'
 
 const $ = (id) => document.getElementById(id)
+// Demo ohne Server: auf GitHub Pages (jeder Host ausser localhost) oder mit ?demo=1. Dann spielt
+// public/lokal.js die Partie im Browser mit Skript-Figuren: kein fetch, kein EventSource, kein Schluessel.
+// ?demo=0 erzwingt den echten Server (z. B. Aufruf ueber LAN-IP oder Tailscale).
+const DEMO_PARAM = new URLSearchParams(location.search).get('demo')
+const DEMO = DEMO_PARAM === '1' || (DEMO_PARAM !== '0' && !/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname))
+let leiter = null   // lokaler Spielleiter (nur Demo)
 const ROLLE = { schatten: 'der Schatten', schluessel: 'der Schlüsselträger', petze: 'die Petze', schueler: 'ein normaler Schüler' }
 const ROLLE_ERKLAERT = {
   schatten: 'Du holst nachts jemanden. Lüge über deinen Platz, lenke ab. Du gewinnst, wenn nur noch zwei übrig sind. Einmal kannst du die Spur verwischen.',
@@ -345,6 +351,7 @@ function ortKnopf(wo, ort, tu) {
 }
 
 async function sende(aktion) {
+  if (DEMO) { const d = leiter?.aktion(aktion) ?? { ok: false, fehler: 'Keine laufende Partie' }; $('fehler').textContent = d.ok ? '' : d.fehler; return }
   for (const b of document.querySelectorAll('#eingabe button')) b.disabled = true
   try {
     const r = await fetch('/aktion', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(aktion) })
@@ -360,6 +367,12 @@ function frisch() { hoechsteNr = -1; verlauf.innerHTML = ''; tippende = new Map(
 async function starten(zuschauen) {
   const name = $('name').value.trim()
   if (!zuschauen && !name) { $('name').focus(); return }
+  if (DEMO) {
+    try { (await lokal()).partie({ name, zuschauen }) } catch (f) { alert(f.message); return }
+    frisch()
+    $('start').hidden = true; $('raum').hidden = false; $('eingabe').hidden = zuschauen
+    return
+  }
   const r = await fetch('/partie', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name, zuschauen, besetzung: besetzung() }) })
   const d = await r.json()
   if (d && d.fehler) { alert(d.fehler); return }
@@ -368,24 +381,43 @@ async function starten(zuschauen) {
   verbinde()
 }
 // Eigene Figuren und Besetzung (fehlt der Server-Teil, bleibt alles wie bisher)
-starteEditor({ onAenderung: (ok) => { for (const b of document.querySelectorAll('#startform button[type="submit"], #zuschauen')) b.disabled = !ok } }).catch(() => {})
+if (!DEMO) starteEditor({ onAenderung: (ok) => { for (const b of document.querySelectorAll('#startform button[type="submit"], #zuschauen')) b.disabled = !ok } }).catch(() => {})
 $('startform').onsubmit = (ev) => { ev.preventDefault(); starten(false) }
 $('zuschauen').onclick = () => starten(true)
-$('neu').onclick = () => { $('raum').hidden = true; $('eingabe').hidden = true; $('start').hidden = false; $('neu').hidden = true; quelle?.close(); quelle = null }
+$('neu').onclick = () => { $('raum').hidden = true; $('eingabe').hidden = true; $('start').hidden = false; $('neu').hidden = true; quelle?.close(); quelle = null; leiter?.beenden() }
 
+// Was mit jeder Nachricht passiert, egal ob sie vom Server-Stream oder vom lokalen Spielleiter kommt
+const EMPFANG = {
+  status: (s) => { status = s; if (!status) return; zeigeKlasse(); zeigeTafel(); zeigeWarte(status.warte) },
+  ereignis: (e) => zeigeEreignis(e),
+  tippt: (d) => zeigeTippt(d.von, d.fertig),
+  warte: (w) => zeigeWarte(w),
+  hefte: (h) => zeigeHefte(h),
+  deckel: (d) => { regie(d.text, 'ende'); $('fehler').textContent = d.text },
+}
 function verbinde() {
   quelle?.close()
   quelle = new EventSource('/ereignisse')
-  quelle.addEventListener('status', (m) => { status = JSON.parse(m.data); if (!status) return; zeigeKlasse(); zeigeTafel(); zeigeWarte(status.warte) })
-  quelle.addEventListener('ereignis', (m) => zeigeEreignis(JSON.parse(m.data)))
-  quelle.addEventListener('tippt', (m) => { const d = JSON.parse(m.data); zeigeTippt(d.von, d.fertig) })
-  quelle.addEventListener('warte', (m) => zeigeWarte(JSON.parse(m.data)))
-  quelle.addEventListener('hefte', (m) => zeigeHefte(JSON.parse(m.data)))
-  quelle.addEventListener('deckel', (m) => { const d = JSON.parse(m.data); regie(d.text, 'ende'); $('fehler').textContent = d.text })
+  for (const [art, tu] of Object.entries(EMPFANG)) quelle.addEventListener(art, (m) => tu(JSON.parse(m.data)))
+}
+async function lokal() {
+  if (leiter) return leiter
+  const { lokalerSpielleiter } = await import('./lokal.js')
+  leiter = lokalerSpielleiter()
+  for (const [art, tu] of Object.entries(EMPFANG)) leiter.an(art, tu)
+  return leiter
+}
+
+if (DEMO) {
+  $('demobanner').hidden = false
+  $('werbung').innerHTML = 'Sechs Mitschüler als <b>Skript-Figuren</b>: Sie nennen ihre Plätze, geben weiter, was sie nachts gesehen haben, halten Behauptungen gegen Beobachtungen und lügen, wenn sie der Schatten sind. Einer von euch ist <b>der Schatten</b>. Vielleicht du.'
+  $('kostenhinweis').textContent = 'Diese Demo kostet nichts und schickt nichts weg: Die Figuren sind Skripte, die Partie läuft nur in deinem Browser.'
+  // Impressum und Datenschutz gelten nur fuer die oeffentliche Demo unter stefanpaun.page
+  if (/(^|\.)stefanpaun\.page$|^stefan-paun\.github\.io$/i.test(location.hostname)) $('recht').hidden = false
 }
 
 // Laeuft schon eine Partie (Seite neu geladen)? Dann direkt rein.
-fetch('/status').then((r) => r.json()).then((s) => {
+if (!DEMO) fetch('/status').then((r) => r.json()).then((s) => {
   if (!s || s.phase === 'ende') return
   status = s; frisch(); $('start').hidden = true; $('raum').hidden = false; $('eingabe').hidden = s.zuschauen; verbinde()
 }).catch(() => {})
