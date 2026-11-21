@@ -31,7 +31,7 @@ export function browserGehirn(name, rolle, { sende, frist = null, zahl = Math.ra
 
   const frage = (was) => new Promise((loese, weise) => {
     const w = frist ? { ...was, frist: Math.round(frist / 1000) } : was
-    offen = { was: w, loese, weise, wecker: null }
+    offen = { was: w, loese, weise, wecker: null, ende: frist ? Date.now() + frist : null }
     if (frist) {
       const meins = offen
       meins.wecker = setTimeout(() => {
@@ -57,7 +57,8 @@ export function browserGehirn(name, rolle, { sende, frist = null, zahl = Math.ra
     merkePruefung() {},
     merkePetze() {},
 
-    wartetAuf: () => offen?.was ?? null,
+    // Mit Frist: die Restzeit in Sekunden (wichtig nach dem Wiederverbinden)
+    wartetAuf: () => (offen ? (offen.ende ? { ...offen.was, frist: Math.max(0, Math.round((offen.ende - Date.now()) / 1000)) } : offen.was) : null),
 
     // Liefert null bei Erfolg, sonst eine Fehlermeldung fuer den Browser.
     aktion(a) {

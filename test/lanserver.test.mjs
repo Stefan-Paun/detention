@@ -308,3 +308,26 @@ test('LAN: zweite Runde – neuer Code, Plaetze bleiben, Lobby waehrend der Part
     assert.equal(s.partie().phase, 'ende')
   } finally { await s.schliessen() }
 })
+
+test('LAN: oeffentliche oder Wildcard-Adresse wird abgelehnt', async () => {
+  for (const adresse of ['0.0.0.0', '8.8.8.8']) {
+    const s = erstelleServer({ gehirnFabrik: fabrik, port: 0, pause: 0, log: () => {}, lan: { adresse, port: 0 } })
+    await assert.rejects(s.starten(), /keine private WLAN-Adresse/)
+  }
+})
+
+test('LAN: nach dem Ende bekommen die Geraete die wieder offene Lobby; Stream zaehlt nicht zur Drossel', async () => {
+  const { s, lokal, gast, code } = await lanServer({ lan: { frist: 20, raten: 5 } })
+  try {
+    const a = (await beitreten(gast, code, 'Ada')).body
+    await anfrage(gast, '/lan/bereit', { methode: 'POST', body: { bereit: true }, token: a.token })
+    // viele Stream-Aufbauten hintereinander: keiner wird mit 429 abgewiesen
+    for (let i = 0; i < 6; i++) assert.equal((await strom(gast, a.token, () => true)).status, 200)
+    const lauf = strom(gast, a.token, (l) => istEnde(l) && l.some((n) => n.art === 'lobby' && n.daten.offen && !n.daten.laeuft && l.indexOf(n) > 2))
+    await new Promise((f) => setTimeout(f, 30))
+    await anfrage(lokal, '/lan/start', { methode: 'POST', body: {} })
+    const st = await lauf
+    const letzte = st.nachrichten.filter((n) => n.art === 'lobby').at(-1).daten
+    assert.equal(letzte.offen, true); assert.equal(letzte.laeuft, false)
+  } finally { await s.schliessen() }
+})

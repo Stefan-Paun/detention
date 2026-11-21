@@ -5,6 +5,7 @@
 //   node server.mjs --lan      zusaetzlich im eigenen WLAN: bis zu 4 Menschen mit Beitrittscode (siehe README)
 
 import http from 'node:http'
+import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -21,7 +22,7 @@ import { hefteSpeicher } from './spiel/hefte.mjs'
 import { figurenSpeicher } from './spiel/figurenspeicher.mjs'
 import { pruefeFigur, kennung, MAX_EIGENE, GRENZEN } from './spiel/figurenschema.mjs'
 import { browserModule } from './tools/seite.mjs'
-import { lanLobby, sitzGehirn, ersatzFigur, lanAdresse, drossel, MAX_MENSCHEN } from './spiel/lan.mjs'
+import { lanLobby, sitzGehirn, ersatzFigur, lanAdresse, istPrivat, drossel, MAX_MENSCHEN } from './spiel/lan.mjs'
 
 const HIER = path.dirname(fileURLToPath(import.meta.url))
 let browserDateien = null   // Set der Module aus spiel/, die der Browser laden darf (tools/seite.mjs)
@@ -143,19 +144,19 @@ export function erstelleServer({ gehirnFabrik, hefte = null, figuren: eigene = n
   function laufen(meins, z) {
     const alt = spiel
     if (alt) { alt.beendet = true; if (alt.p.phase !== 'ende') alt.abbrechen() }
-    if (alt?.lan && !meins.lan && lobby && !lobby.offen) lobby.oeffnen()   // Einzelpartie loest eine LAN-Partie ab: Lobby wieder auf
+    if (alt?.lan && !meins.lan && lobby && !lobby.offen) { lobby.oeffnen(); queueMicrotask(sendeLobby) }   // Einzelpartie loest eine LAN-Partie ab: Lobby wieder auf
     meins.kennung = ++partien
     spiel = meins
     const p = meins.p
     const beobachter = (e) => { if (meins.beendet) return; sendeEreignis(e); sendeStatus() }
     spieleBisZumEnde(p, meins.gehirne, { zufall: z, beobachter, abbruch: () => meins.beendet, pause: () => new Promise((f) => setTimeout(f, pause)) })
-      .then(() => { if (meins.lan) { if (!meins.beendet) lobby.oeffnen() } else return hefteSchreiben(meins) })
+      .then(() => { if (meins.lan) { if (!meins.beendet) { lobby.oeffnen(); sendeLobby() } } else return hefteSchreiben(meins) })
       .catch((f) => {
         log(`Partie beendet: ${f.message}`)
         if (meins.beendet) return   // abgeloest durch eine neue Partie: nichts mehr senden
         if (p.phase !== 'ende') { p.phase = 'ende'; p.sieger = p.sieger || null }
         if (meins.lan && !lobby.offen) lobby.oeffnen()
-        sendeStatus()
+        sendeStatus(); sendeLobby()
       })
   }
 
@@ -171,7 +172,7 @@ export function erstelleServer({ gehirnFabrik, hefte = null, figuren: eigene = n
     const namen = [...ki.map((f) => f.name), ...menschenNamen]
     if (namen.length > 8) throw new Error(`Zu viele im Raum (${namen.length}); höchstens 8. Wähle weniger KI-Figuren.`)
     if (new Set(namen.map((n) => n.toLowerCase())).size !== namen.length) throw new Error('Ein Name ist doppelt (Mensch und Figur)')
-    const z = zufall(startwert ?? Date.now())
+    const z = zufall(startwert ?? crypto.randomInt(2 ** 32))   // nicht Date.now(): sonst rechnet ein Gast aus Startzeit und eigener Rolle alle Rollen aus
     const p = P.neuePartie(namen, z, { menschen: menschenNamen })
     const datenVon = Object.fromEntries(ki.map((f) => [f.name, f]))
     const figuren = Object.fromEntries(namen.map((n) => {
@@ -221,7 +222,7 @@ export function erstelleServer({ gehirnFabrik, hefte = null, figuren: eigene = n
     const ki = besetzen(besetzung)
     const namen = [...ki.map((f) => f.name), zuschauen ? ZUSCHAUER_ERSATZ : spieler]
     if (new Set(namen.map((n) => n.toLowerCase())).size !== namen.length) throw new Error('Der Name ist schon vergeben')
-    const z = zufall(startwert ?? Date.now())
+    const z = zufall(startwert ?? crypto.randomInt(2 ** 32))
     const p = P.neuePartie(namen, z, { spieler })
     const datenVon = Object.fromEntries(ki.map((f) => [f.name, f]))
     const figuren = Object.fromEntries(namen.map((n) => [n, n === spieler ? { haut: '#f1cfb0', haar: '#2b2118', frisur: 'wuschel', shirt: '#bd93f9' } : (datenVon[n] ?? ladeFigur(n)).aussehen]))
@@ -297,7 +298,8 @@ export function erstelleServer({ gehirnFabrik, hefte = null, figuren: eigene = n
     // Token: Kopfzeile (fetch) oder ?token= (EventSource kann keine Kopfzeilen); POST nur per Kopfzeile
     const token = req.headers['x-nachsitzen-token'] || (req.method === 'GET' ? url.searchParams.get('token') : null)
     const platz = lobby.sitzVon(token)
-    if (platz && !lanRaten.erlaubt(platz.token)) { antwort(429, { ok: false, fehler: 'Zu viele Anfragen. Kurz warten.' }); return }
+    // Der Stream zaehlt nicht: EventSource verbindet sich selbst neu und gaebe nach einem 429 fuer immer auf
+    if (platz && pfad !== '/lan/ereignisse' && !lanRaten.erlaubt(platz.token)) { antwort(429, { ok: false, fehler: 'Zu viele Anfragen. Kurz warten.' }); return }
 
     if (req.method === 'POST' && pfad === '/lan/beitreten') {
       const body = await lies(req, MAX_LAN_KOERPER)
@@ -338,7 +340,7 @@ export function erstelleServer({ gehirnFabrik, hefte = null, figuren: eigene = n
     if (req.method === 'GET' && pfad === '/lan/ereignisse') {
       // hoechstens 3 Leitungen je Platz (Handy, Tablet, neu geladen); die aelteste faellt weg
       const meine = [...verbindungen].filter(([, v]) => v.lan && v.sitz === platz.name)
-      for (const [r] of meine.slice(0, Math.max(0, meine.length - 2))) { r.end(); verbindungen.delete(r) }
+      for (const [r] of meine.slice(0, Math.max(0, meine.length - 2))) { r.write(sseZeile('ersetzt', {})); r.end(); verbindungen.delete(r) }   // Browser schliesst dann selbst, statt sich neu zu verbinden
       oeffneStrom(req, res, { lan: true, sitz: platz.name })
       res.write(sseZeile('lobby', lobbyDaten(null, platz)))
       return
@@ -473,6 +475,8 @@ export function erstelleServer({ gehirnFabrik, hefte = null, figuren: eigene = n
       const lokalPort = await lausche(server, port, host)
       if (lanServer) {
         const adresse = lan.adresse ?? lanAdresse()
+        // Nur private Adressen; Loopback (127.x) zum Ausprobieren am eigenen Rechner
+        if (adresse && !istPrivat(adresse) && !/^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(adresse)) { server.close(); throw new Error(`${adresse} ist keine private WLAN-Adresse (192.168.x.x, 10.x.x.x, 172.16-31.x.x). Der LAN-Modus bindet nie öffentlich oder an alle Adressen.`) }
         if (!adresse) { server.close(); throw new Error('Keine WLAN-Adresse gefunden (192.168.x.x, 10.x.x.x oder 172.16-31.x.x). Ohne --lan läuft das Spiel nur auf diesem Rechner.') }
         try { lanZiel = { adresse, port: await lausche(lanServer, lan.port ?? lokalPort, adresse) } } catch (f) { server.close(); throw f }
       }

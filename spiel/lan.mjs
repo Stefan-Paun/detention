@@ -54,6 +54,7 @@ export function lanLobby({ maxMenschen = MAX_MENSCHEN, jetzt = Date.now, code: f
   const plaetze = []        // { name, token, bereit, gastgeber }
   const fehlProAdresse = drossel({ max: 5, fensterMs: 60_000, jetzt })
   const fehlGesamt = drossel({ max: 20, fensterMs: 60_000, jetzt })
+  let fehlZaehler = 0       // Fehlversuche auf den aktuellen Code; ab 20 gibt es einen neuen Code (keine Sperre fuer alle)
 
   const sitzVon = (token) => (token ? plaetze.find((p) => gleich(p.token, token)) ?? null : null)
 
@@ -65,13 +66,20 @@ export function lanLobby({ maxMenschen = MAX_MENSCHEN, jetzt = Date.now, code: f
 
     beitreten({ code: eingabe, name, adresse = '?', lokal = false }) {
       if (!lokal) {
-        if (fehlProAdresse.voll(adresse) || fehlGesamt.voll('*')) throw fehler('Zu viele Fehlversuche. Warte eine Minute.', 429)
-        if (!gleich(normalisiereCode(eingabe), code)) { fehlProAdresse.zaehle(adresse); fehlGesamt.zaehle('*'); throw fehler('Der Code stimmt nicht.', 403) }
+        if (fehlProAdresse.voll(adresse)) throw fehler('Zu viele Fehlversuche. Warte eine Minute.', 429)
+        if (!gleich(normalisiereCode(eingabe), code)) {
+          fehlProAdresse.zaehle(adresse); fehlGesamt.zaehle('*')
+          // Viele Fehlversuche von vielen Adressen: Code wechseln (der Gastgeber sieht den neuen am Rechner)
+          if (++fehlZaehler >= 20 || fehlGesamt.voll('*')) { code = festerCode ?? neuerCode(); fehlZaehler = 0 }
+          throw fehler('Der Code stimmt nicht.', 403)
+        }
       }
       if (!offen) throw fehler('Die Partie läuft schon. Beitreten geht nur in der Lobby.', 409)
       if (plaetze.length >= maxMenschen) throw fehler(`Es sind schon ${maxMenschen} Menschen dabei.`, 409)
       if (!String(name ?? '').trim()) throw fehler('Gib einen Namen ein.')
       const n = pruefeName(name)
+      // Im LAN nur Buchstaben, Ziffern, Leerzeichen, Punkt, Bindestrich, Apostroph: kein [, ], :, ( im Prompt der Figuren
+      if (!/^[\p{L}\p{N}][\p{L}\p{N} .'-]*$/u.test(n)) throw fehler('Der Name darf nur Buchstaben, Ziffern, Leerzeichen, Punkt, Bindestrich und Apostroph enthalten.')
       if (KI_FIGUREN.some((k) => k.toLowerCase() === n.toLowerCase())) throw fehler(`„${n}“ ist schon eine Figur im Spiel. Wähle einen anderen Namen.`)
       if (plaetze.some((p) => p.name.toLowerCase() === n.toLowerCase())) throw fehler(`Den Namen „${n}“ hat schon jemand.`)
       const platz = { name: n, token: neuesToken(), bereit: false, gastgeber: !!lokal }
@@ -88,7 +96,7 @@ export function lanLobby({ maxMenschen = MAX_MENSCHEN, jetzt = Date.now, code: f
 
     schliessen() { offen = false },
     // Neue Runde nach einer Partie: neuer Code, alle wieder "nicht bereit", Plaetze bleiben
-    oeffnen() { offen = true; code = festerCode ?? neuerCode(); for (const p of plaetze) p.bereit = false },
+    oeffnen() { offen = true; code = festerCode ?? neuerCode(); fehlZaehler = 0; for (const p of plaetze) p.bereit = false },
   }
 }
 
@@ -125,9 +133,11 @@ export function ersatzFigur(name) {
   }
 }
 
+export const istPrivat = (a) => /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)\d{1,3}\.\d{1,3}(\.\d{1,3})?$/.test(String(a)) && String(a).split('.').length === 4
+
 // Erste private IPv4-Adresse (WLAN/LAN) oder null. Nie 0.0.0.0: wir binden nur, wo wir es sagen.
 export function lanAdresse(netze = os.networkInterfaces()) {
-  const privat = (a) => /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(a)
+  const privat = istPrivat
   for (const liste of Object.values(netze)) for (const n of liste ?? []) if ((n.family === 'IPv4' || n.family === 4) && !n.internal && privat(n.address)) return n.address
   return null
 }

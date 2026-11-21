@@ -315,10 +315,10 @@ function zeigeKlasse() {
 let fristUhr = null, fristFuer = null, fristSpan = null
 // LAN-Modus: Restzeit der Frage hinter dem Hinweis (die Frage traegt die Frist in Sekunden)
 function zeigeFrist(w) {
-  const schluessel = w?.frist ? JSON.stringify(w) : null
+  const schluessel = w?.frist != null ? JSON.stringify({ ...w, frist: 0 }) : null   // dieselbe Frage, auch wenn die Restzeit neu kommt
   if (schluessel !== fristFuer) {
     clearInterval(fristUhr); fristUhr = null; fristFuer = schluessel; fristSpan = null
-    if (schluessel) {
+    if (schluessel && w.frist > 0) {
       const ende = Date.now() + w.frist * 1000
       const span = fristSpan = document.createElement('span'); span.className = 'frist'
       const tick = () => { const rest = Math.max(0, Math.round((ende - Date.now()) / 1000)); span.textContent = ` · noch ${rest} s`; if (!rest) clearInterval(fristUhr) }
@@ -415,7 +415,8 @@ $('neu').onclick = () => { if (LAN_GAST) { gast?.zurLobby(); $('neu').hidden = t
 // Was mit jeder Nachricht passiert, egal ob sie vom Server-Stream oder vom lokalen Spielleiter kommt
 const EMPFANG = {
   status: (s) => {
-    status = s; if (!status) return
+    status = s
+    if (!status) { if (LAN_GAST && !$('raum').hidden) gast?.zurLobby(); return }   // LAN-Partie abgebrochen: zurueck in die Lobby
     // LAN: sobald die Partie laeuft und das Geraet einen Platz hat, von der Lobby in den Raum
     if (LAN_GAST && status.spieler && $('raum').hidden && status.phase !== 'ende') zurSpielansicht()
     zeigeKlasse(); zeigeTafel(); zeigeWarte(status.warte)
@@ -428,6 +429,7 @@ const EMPFANG = {
   lobby: (d) => { gast?.lobby(d); gastgeber?.zeige(d) },
   frist: (d) => regie(d.text, 'geheim'),
   uebergeben: (d) => { quelle?.close(); quelle = null; gast?.weg(d.text) },
+  ersetzt: () => { quelle?.close(); quelle = null; $('fehler').textContent = 'Dieser Platz ist jetzt auf einem anderen Gerät offen. Lade neu, um hier weiterzuspielen.' },
 }
 function zurSpielansicht() { $('lan').hidden = true; $('start').hidden = true; $('raum').hidden = false; $('eingabe').hidden = false }
 function verbinde() {
