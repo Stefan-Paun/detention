@@ -17,6 +17,7 @@
     <button class="schalter" id="r-schrecken" aria-pressed="true" title="Kleine Schreckmomente in der Nacht (Gestalt, Fenster, Flackern)">Schrecken</button>
     <button class="schalter" id="r-daemmerung" aria-pressed="false" title="Alles ruhiger: heller, ohne Schrecken, ohne Bewegung">Dämmerung</button>
   </div>
+  <div class="lanleiste" id="lanleiste" hidden role="group" aria-label="Plätze an die KI geben"></div>
   <button class="knopf leise" id="heftknopf" hidden>Hefte lesen</button>
   <button class="knopf leise" id="neu" hidden>Neue Partie</button>
 </header>
@@ -43,8 +44,37 @@
         <button class="knopf leise" type="button" id="zuschauen">Nur zuschauen</button>
       </div>
     </form>
+    <aside class="lanbox" id="lanbox" hidden aria-label="Mitspielen im WLAN">
+      <h2>Im WLAN mitspielen</h2>
+      <p class="klein">Mitspieler öffnen <b class="lanadresse" id="lanadresse"></b> und tippen diesen Code ein:</p>
+      <p class="lancode" id="lancode" aria-label="Beitrittscode"></p>
+      <ul class="lanplaetze" id="lanboxplaetze"></ul>
+      <div class="reihe">
+        <a class="knopf leise" href="?lan=1">Selbst einen Platz nehmen</a>
+        <button class="knopf" type="button" id="lanstart">LAN-Partie starten</button>
+      </div>
+      <p class="fehler" id="lanboxfehler" role="alert"></p>
+      <p class="klein">Nur im eigenen WLAN mit Leuten, die du kennst. Bis zu 4 Menschen, die übrigen Plätze spielen KI-Figuren. Ohne Hefte.</p>
+    </aside>
     <p class="klein" id="kostenhinweis">Jede Partie kostet ein paar Cent an KI-Aufrufen. Läuft nur auf diesem Rechner.</p>
     <p class="klein recht" id="recht" hidden><a href="https://stefanpaun.page/impressum.html">Impressum</a> · <a href="https://stefanpaun.page/datenschutz.html">Datenschutz</a></p>
+  </section>
+
+  <section class="lan" id="lan" hidden aria-label="Mitspielen im WLAN">
+    <h1>Nachsitzen im WLAN</h1>
+    <form id="lanbeitritt" autocomplete="off">
+      <label id="lancodefeld">Beitrittscode <input id="lancodeein" maxlength="9" placeholder="z. B. K7QM3X" autocapitalize="characters" spellcheck="false" inputmode="text"></label>
+      <label>Dein Name <input id="lanname" maxlength="20" placeholder="z. B. Alex" required></label>
+      <button class="knopf" type="submit">Beitreten</button>
+    </form>
+    <div id="lanlobby" hidden>
+      <p>Du bist dabei als <b id="lanich"></b>. Warte, bis alle bereit sind; der Gastgeber startet.</p>
+      <ul class="lanplaetze" id="lanplaetze" aria-live="polite"></ul>
+      <button class="knopf" type="button" id="lanbereit" aria-pressed="false">Ich bin bereit</button>
+      <button class="knopf leise" type="button" id="lanzumspiel" hidden>Zur Partie</button>
+    </div>
+    <p class="fehler" id="lanfehler" role="alert"></p>
+    <p class="klein">Nur im eigenen WLAN. Jede Entscheidung hat eine Frist; wer sie verpasst, enthält sich.</p>
   </section>
 
   <section class="editor" id="editor" hidden aria-label="Figuren-Editor">

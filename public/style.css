@@ -195,3 +195,36 @@ body.daemmerung .lampe { transition: none; }
 .karte-vorschau .geheim { background: var(--papier-dunkel); border-radius: 8px; padding: 6px 8px; }
 .karte-vorschau .leer { color: #77789a; }
 @media (max-width: 860px) { .editorraster { grid-template-columns: 1fr; } }
+
+/* --- LAN-Modus: Lobby, Code, Handy ------------------------------------------------------- */
+.lan { max-width: 480px; margin: 6vh auto; padding: 0 16px; width: 100%; }
+.lan h1 { font-size: 28px; margin: 0 0 12px; }
+.lan p { color: var(--gedaempft); }
+.lan label { display: flex; flex-direction: column; gap: 6px; margin: 16px 0 12px; font-size: 14px; color: var(--gedaempft); }
+.lan input { font: inherit; font-size: 18px; padding: 12px; border-radius: 10px; border: 1px solid var(--linie); background: var(--wand); color: var(--text); }
+#lancodeein { letter-spacing: .25em; text-transform: uppercase; }
+.lan .knopf { min-height: 44px; }
+.lanbox { margin: 24px 0; padding: 12px 16px; border: 1px solid var(--linie); border-radius: 12px; background: var(--tafel); }
+.lanbox h2 { font-size: 18px; margin: 0 0 6px; }
+.lanadresse { color: var(--text); word-break: break-all; }
+.lancode { font: 700 32px/1.2 ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: .2em; color: var(--lampe); margin: 6px 0 10px; }
+.lanplaetze { list-style: none; padding: 0; margin: 10px 0 14px; display: flex; flex-direction: column; gap: 6px; }
+.lanplaetze li { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid var(--linie); border-radius: 10px; }
+.lanplaetze li .n { flex: 1; }
+.lanplaetze li .b { font-size: 13px; color: var(--gedaempft); }
+.lanplaetze li .b.ja { color: var(--mint); }
+.lanplaetze .knopf { padding: 4px 10px; font-size: 13px; }
+.lanleiste { display: flex; gap: 6px; flex-wrap: wrap; }
+.lanleiste .knopf { padding: 4px 10px; font-size: 13px; }
+.frist { color: var(--lampe); font-variant-numeric: tabular-nums; }
+/* Spieleransicht am Handy: eine Spalte, Eingabe unten fest, grosse Knoepfe */
+@media (max-width: 760px) {
+  body.lan-gast .raum { display: flex; flex-direction: column; }
+  body.lan-gast .tafel { max-height: none; }
+  body.lan-gast .links { flex: none; }
+  body.lan-gast .verlauf { flex: none; height: 55vh; }
+  body.lan-gast .eingabe { position: sticky; bottom: 0; z-index: 2; }
+  body.lan-gast .wahl .knopf, body.lan-gast .sagen .knopf { min-height: 44px; }
+  body.lan-gast .wahl .knopf.ortknopf { max-width: none; flex: 1 1 140px; }
+  body.lan-gast .regler { display: none; }
+}
