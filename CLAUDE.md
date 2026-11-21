@@ -21,6 +21,7 @@ Werwolf-artiges Spiel: Stefan + sechs Claude-Figuren (Mira, Jonas, Lea, Tarik, N
 - `spiel/kosten.mjs`: Tageszähler mit Deckel. `spiel/schleife.mjs`: eine Schleife für alle Gehirne.
 - `spiel/spurentafel.mjs`: Spurentafel als Text (Terminal, `zug.mjs --tafel`); gleiche Logik wie `merke`/`zeigeTafel` in `public/app.js`. Private Nacht-Ereignisse (`platz`, `schatten-waehlt`, `pruefung`, `ergebnis`) tragen `wer`; Zuschauer und Geister sehen sie mit Namen, Figuren nur die eigenen.
 - Browser-Demo: `public/lokal.js` spielt ohne Server mit `spiel/skriptgehirne.mjs` (auf Pages oder `?demo=1`). Alles, was `public/*.js` importiert, muss ohne `node:` auskommen; `tools/seite.mjs` baut `_site/` und bricht sonst ab. `tools/skriptgehirne.mjs` ist nur noch ein Re-Export.
+- `spiel/lan.mjs` + `public/lan.js`: opt-in LAN-Modus (`--lan`/`NACHSITZEN_LAN=1`), bis 4 Menschen mit Beitrittscode und Token. Der Server hält je SSE-Leitung eine Sicht (`darfSehen`); LAN-Geräte erreichen nur Seite und `/lan/*`, nie Hefte, Figuren oder die Einzelpartie. LAN-Partien schreiben keine Hefte. Tests: `test/lan*.test.mjs` (zweiter Port auf 127.0.0.1 statt WLAN).
 - `spiel/hefte.mjs`: Erinnerung über Partien (JSON je Figur unter `~/.local/share/nachsitzen/hefte/`). Die Hefte enthalten Urteile über Stefan; nie in Logs, Commits oder Screenshots.
 
 ## Regeln

@@ -69,6 +69,26 @@ Die Figuren laufen auf Claude Haiku 5.5. Eine Partie braucht 40 bis 80 Aufrufe u
 
 Mitspielen geht auch ohne Browser: `node tools/zug.mjs 4800 --neu DeinName`, dann `node tools/zug.mjs 4800` und die Befehle, die es vorschlägt; `--tafel` zeigt die Spurentafel als Text. `npm run spiele` spielt ganz im Terminal und blendet die Tafel vor jedem Gespräch ein.
 
+### Zu zweit bis viert im WLAN
+
+> **Nur im eigenen WLAN, nur mit Leuten, die du kennst.** Der LAN-Modus ist für den Abend zu Hause gedacht, nicht fürs Internet und nicht fürs Café-WLAN.
+
+```bash
+npm start -- --lan            # mit echten KI-Figuren (kostet wie immer ein paar Cent pro Partie)
+node server.mjs --skript --lan   # ohne KI und ohne Kosten, zum Ausprobieren
+```
+
+Das Terminal zeigt die Adresse (`http://192.168.x.x:4800/?lan=1`) und einen **Beitrittscode** aus 6 Zeichen. Die anderen öffnen die Adresse am Handy, tippen Code und Namen ein und drücken „Ich bin bereit“. Am Rechner (`http://localhost:4800`) siehst du Code, Adresse und wer da ist; mit „Selbst einen Platz nehmen“ spielst du selbst mit, mit „LAN-Partie starten“ geht es los, sobald alle bereit sind.
+
+- Bis zu **4 Menschen**, die übrigen Plätze spielen KI-Figuren (zusammen 7, mindestens 3 KI).
+- Jedes Gerät sieht **nur seine eigene Sicht**: eigene Rolle, eigener Platz, eigene Beobachtungen. Wer raus ist, hört das Gespräch weiter, sieht aber keine Geheimnisse der anderen. Der Rechner des Gastgebers zeigt während der Partie nur, was alle wissen.
+- Jede Entscheidung hat eine **Frist von 90 Sekunden**; wer sie verpasst, enthält sich (schweigt, stimmt für niemanden, Platz per Zufall). Wer die Seite neu lädt oder kurz das WLAN verliert, kommt mit demselben Gerät wieder rein.
+- Geht jemand früher, gibt der Gastgeber den Platz oben in der Leiste **an die KI** („Name → KI“).
+- Beitreten geht nur in der Lobby vor dem Start und nur mit Code; Fehlversuche werden gebremst. Danach hat jedes Gerät ein eigenes, langes Sitzungs-Token. Über die WLAN-Adresse gibt es nur das Spiel selbst: keine Hefte, keine eigenen Figuren, keine Einzelpartie.
+- LAN-Partien schreiben **keine Hefte**. Der Tagesdeckel für die KI-Kosten gilt unverändert.
+
+Ohne `--lan` (oder `NACHSITZEN_LAN=1`) ändert sich nichts: Der Server hört nur auf `127.0.0.1`. Findet er keine private Adresse (192.168.x.x, 10.x.x.x, 172.16–31.x.x), bricht er ab; eine bestimmte Adresse setzt `NACHSITZEN_LAN_ADRESSE`.
+
 ## Was passiert
 
 | Phase | |
@@ -117,7 +137,7 @@ npm run spiele -- --zuschauen     # eine echte Partie im Terminal (kostet Cent)
 node tools/seite.mjs _site        # statische Browser-Demo bauen (wie der Pages-Workflow)
 ```
 
-Aufbau: `spiel/partie.mjs` (Regeln; jedes Ereignis weiß, wer es sehen darf), `spiel/regeln.mjs` (die Stellschrauben als ein Objekt, Standard = heutiges Spiel), `spiel/welt.mjs` (die Wahrheit hinter dem Gerede: Plätze, Spuren, Beobachtungen), `spiel/gehirn.mjs` (Claude-Figur mit eigenem Kontext und Werkzeug-Aufrufen), `spiel/hefte.mjs` (Erinnerung), `spiel/figurenschema.mjs` / `spiel/figurenspeicher.mjs` / `spiel/figurentext.mjs` (eigene Figuren: Prüfung, Ablage, Prompt-Bereinigung), `spiel/spurentafel.mjs` (die Spurentafel als Text für Terminal und `zug.mjs --tafel`), `spiel/skriptgehirne.mjs` (Skript-Figuren für Tests, Simulation und Demo), `server.mjs` (lokaler Server, SSE), `public/` (Browser, Pixelszene), `public/lokal.js` (Spielleiter im Browser für die Demo). Was im Browser läuft, darf nichts aus `node:` importieren; `tools/seite.mjs` prüft das beim Bauen. Der Plan mit allen Entscheidungen: [docs/PLAN.md](docs/PLAN.md).
+Aufbau: `spiel/partie.mjs` (Regeln; jedes Ereignis weiß, wer es sehen darf), `spiel/lan.mjs` (LAN-Modus: Code, Token, Drossel, Lobby, Übergabe an die KI), `public/lan.js` (Beitritt und Lobby im Browser), `spiel/regeln.mjs` (die Stellschrauben als ein Objekt, Standard = heutiges Spiel), `spiel/welt.mjs` (die Wahrheit hinter dem Gerede: Plätze, Spuren, Beobachtungen), `spiel/gehirn.mjs` (Claude-Figur mit eigenem Kontext und Werkzeug-Aufrufen), `spiel/hefte.mjs` (Erinnerung), `spiel/figurenschema.mjs` / `spiel/figurenspeicher.mjs` / `spiel/figurentext.mjs` (eigene Figuren: Prüfung, Ablage, Prompt-Bereinigung), `spiel/spurentafel.mjs` (die Spurentafel als Text für Terminal und `zug.mjs --tafel`), `spiel/skriptgehirne.mjs` (Skript-Figuren für Tests, Simulation und Demo), `server.mjs` (lokaler Server, SSE), `public/` (Browser, Pixelszene), `public/lokal.js` (Spielleiter im Browser für die Demo). Was im Browser läuft, darf nichts aus `node:` importieren; `tools/seite.mjs` prüft das beim Bauen. Der Plan mit allen Entscheidungen: [docs/PLAN.md](docs/PLAN.md).
 
 ### Balance-Labor
 

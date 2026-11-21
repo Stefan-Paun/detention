@@ -5,13 +5,17 @@ import { layout, zeichneFigur, klasseAnimator, waehleSchreck } from './klasse.js
 import { tonAnlage } from './ton.js'
 import { starteEditor, besetzung } from './editor.js'
 import { farbeFuer } from './besetzung.js'
+import { lanGast, lanGastgeber, lanAnfrage, ereignisUrl } from './lan.js'
 
 const $ = (id) => document.getElementById(id)
 // Demo ohne Server: auf GitHub Pages (jeder Host ausser localhost) oder mit ?demo=1. Dann spielt
 // public/lokal.js die Partie im Browser mit Skript-Figuren: kein fetch, kein EventSource, kein Schluessel.
 // ?demo=0 erzwingt den echten Server (z. B. Aufruf ueber LAN-IP oder Tailscale).
+// ?lan=1: Mitspielen im WLAN (server.mjs --lan), eigener Platz mit Token; nie Demo.
 const DEMO_PARAM = new URLSearchParams(location.search).get('demo')
-const DEMO = DEMO_PARAM === '1' || (DEMO_PARAM !== '0' && !/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname))
+const LAN_GAST = new URLSearchParams(location.search).get('lan') === '1'
+const DEMO = !LAN_GAST && (DEMO_PARAM === '1' || (DEMO_PARAM !== '0' && !/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)))
+let gast = null, gastgeber = null   // LAN-Modus: Oberflaeche aus public/lan.js
 let leiter = null   // lokaler Spielleiter (nur Demo)
 const ROLLE = { schatten: 'der Schatten', schluessel: 'der Schlüsselträger', petze: 'die Petze', schueler: 'ein normaler Schüler' }
 const ROLLE_ERKLAERT = {
@@ -24,6 +28,7 @@ const PHASE = {
   abend: 'Abend. Die Tür ist zu.', nacht: 'Nacht. Die Lampe ist aus.', morgen: 'Morgen.',
   diskussion: 'Ihr redet.', abstimmung: 'Abstimmung: Wer kommt in den Keller?', ergebnis: 'Ergebnis.', ende: 'Ende.',
 }
+const GEIST_LAN = 'Du bist raus. Im WLAN-Spiel hörst du das Gespräch weiter, aber keine Geheimnisse der anderen. Bitte verrate den anderen nichts.'
 const BEI = { 'Tür': 'bei der Tür', 'Tafel': 'an der Tafel', 'Pulte': 'bei den Pulten', 'Fenster': 'am Fenster' }
 const ORT_TIPP = { 'Tür': 'ganz links · hört jeden Schritt im Raum', 'Tafel': 'links · merkt jeden, der vorbeihuscht', 'Pulte': 'Mitte · sieht je eine Person links und rechts', 'Fenster': 'ganz rechts · Mondlicht zeigt alle am Fenster' }
 const RICHTUNG = { tuer: '← Richtung Tür', fenster: 'Richtung Fenster →', hier: '● gleich daneben' }
@@ -136,7 +141,7 @@ function zeigeEreignis(e) {
     case 'verschwunden':
       karten.morgen = karte('morgen', `Morgen ${e.nacht}`)
       kartenZeile(karten.morgen, e.text, 'schwer'); ton.klang('verschwunden')
-      if (e.name === ich) regie('Du bist verschwunden. Als Geist siehst du ab jetzt alles: jeden Platz, jede Beobachtung, jeden Zettel. Die Spurentafel füllt sich von selbst.', 'ende'); break
+      if (e.name === ich) regie(status?.lan ? GEIST_LAN : 'Du bist verschwunden. Als Geist siehst du ab jetzt alles: jeden Platz, jede Beobachtung, jeden Zettel. Die Spurentafel füllt sich von selbst.', 'ende'); break
     case 'fund': kartenZeile(karten.morgen || (karten.morgen = karte('morgen', `Morgen ${e.nacht}`)), e.text, e.typ === 'notiz' ? 'fund notiz' : 'fund'); break
     case 'zettel': kartenZeile(karten.morgen || (karten.morgen = karte('morgen', `Morgen ${e.nacht}`)), `Ein Zettel unter der Tür: „${e.text}“`, 'fund'); break
     case 'hausmeister': case 'glocke': kartenZeile(karten.morgen || (karten.morgen = karte('morgen', `Morgen ${e.nacht}`)), e.text, 'ereignis'); break
@@ -149,7 +154,7 @@ function zeigeEreignis(e) {
     case 'schweigt': blase(e.von, `${e.von === ich ? 'Du schweigst' : `${e.von} schweigt`}.`, { still: true }); break
     case 'abstimmung': regie(e.text, 'schwer'); break
     case 'stimme': blase(e.von, e.von === ich ? `Dein Zettel: ${e.fuer ?? 'niemand'}.` : (e.fuer ? `stimmt für ${e.fuer === ich ? 'dich' : e.fuer}.` : 'stimmt nicht ab.'), { still: true }); break
-    case 'eingesperrt': regie(`${e.name} kommt in den Keller. ${e.name} war ${ROLLE[e.rolle]}.`, 'schwer'); ton.klang('eingesperrt'); if (e.name === ich) regie('Du sitzt im Keller. Als Geist siehst du ab jetzt alles: jeden Platz, jede Beobachtung, jeden Zettel.', 'ende'); break
+    case 'eingesperrt': regie(`${e.name} kommt in den Keller. ${e.name} war ${ROLLE[e.rolle]}.`, 'schwer'); ton.klang('eingesperrt'); if (e.name === ich) regie(status?.lan ? GEIST_LAN : 'Du sitzt im Keller. Als Geist siehst du ab jetzt alles: jeden Platz, jede Beobachtung, jeden Zettel.', 'ende'); break
     case 'niemand': regie(`Niemand kommt in den Keller${e.gleichstand ? ' (Gleichstand)' : ''}.`); break
     case 'ende': regie(e.sieger === 'schueler' ? `Die Schüler haben gewonnen. Der Schatten war ${e.schatten}.` : `Der Schatten hat gewonnen. Es war ${e.schatten}.`, 'ende'); ton.klang(e.sieger === 'schueler' ? 'ende-schueler' : 'ende-schatten'); break
   }
@@ -301,13 +306,29 @@ function zeigeKlasse() {
   }
   $('phase').textContent = status.phase === 'ende' ? 'Die Tür geht auf.' : `${PHASE[status.phase] || ''}${status.nacht ? ` · Nacht ${status.nacht}` : ''}`
   $('lampe').classList.toggle('aus', status.phase === 'nacht')
-  $('neu').hidden = false
+  $('neu').hidden = LAN_GAST && status.phase !== 'ende'   // im WLAN-Spiel startet nur der Gastgeber neu
   $('heftknopf').hidden = !(status.hefte && status.phase === 'ende')
   if (status.rolle && !$('meinerolle').textContent) $('meinerolle').textContent = `Deine Rolle: ${ROLLE[status.rolle]}. ${ROLLE_ERKLAERT[status.rolle] || ''}`
 }
 
 // --- Eingabe -------------------------------------------------------------------------
-function zeigeWarte(w) {
+let fristUhr = null, fristFuer = null, fristSpan = null
+// LAN-Modus: Restzeit der Frage hinter dem Hinweis (die Frage traegt die Frist in Sekunden)
+function zeigeFrist(w) {
+  const schluessel = w?.frist != null ? JSON.stringify({ ...w, frist: 0 }) : null   // dieselbe Frage, auch wenn die Restzeit neu kommt
+  if (schluessel !== fristFuer) {
+    clearInterval(fristUhr); fristUhr = null; fristFuer = schluessel; fristSpan = null
+    if (schluessel && w.frist > 0) {
+      const ende = Date.now() + w.frist * 1000
+      const span = fristSpan = document.createElement('span'); span.className = 'frist'
+      const tick = () => { const rest = Math.max(0, Math.round((ende - Date.now()) / 1000)); span.textContent = ` · noch ${rest} s`; if (!rest) clearInterval(fristUhr) }
+      tick(); fristUhr = setInterval(tick, 1000)
+    }
+  }
+  if (fristSpan) $('hinweis').appendChild(fristSpan)
+}
+function zeigeWarte(w) { zeigeFrage(w); zeigeFrist(w) }
+function zeigeFrage(w) {
   const sagen = $('sagen'), wahl = $('wahl'), hinweis = $('hinweis')
   sagen.hidden = true; wahl.hidden = true; wahl.innerHTML = ''
   if (!w) { hinweis.textContent = status?.spieler && status.phase !== 'ende' ? 'Die anderen reden …' : ''; return }
@@ -353,6 +374,11 @@ function ortKnopf(wo, ort, tu) {
 async function sende(aktion) {
   if (DEMO) { const d = leiter?.aktion(aktion) ?? { ok: false, fehler: 'Keine laufende Partie' }; $('fehler').textContent = d.ok ? '' : d.fehler; return }
   for (const b of document.querySelectorAll('#eingabe button')) b.disabled = true
+  if (LAN_GAST) {
+    try { const d = await lanAnfrage('/lan/aktion', aktion); $('fehler').textContent = d.ok ? '' : d.fehler }
+    finally { for (const b of document.querySelectorAll('#eingabe button')) b.disabled = false }
+    return
+  }
   try {
     const r = await fetch('/aktion', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(aktion) })
     const d = await r.json()
@@ -384,20 +410,31 @@ async function starten(zuschauen) {
 if (!DEMO) starteEditor({ onAenderung: (ok) => { for (const b of document.querySelectorAll('#startform button[type="submit"], #zuschauen')) b.disabled = !ok } }).catch(() => {})
 $('startform').onsubmit = (ev) => { ev.preventDefault(); starten(false) }
 $('zuschauen').onclick = () => starten(true)
-$('neu').onclick = () => { $('raum').hidden = true; $('eingabe').hidden = true; $('start').hidden = false; $('neu').hidden = true; quelle?.close(); quelle = null; leiter?.beenden() }
+$('neu').onclick = () => { if (LAN_GAST) { gast?.zurLobby(); $('neu').hidden = true; return } $('raum').hidden = true; $('eingabe').hidden = true; $('start').hidden = false; $('neu').hidden = true; quelle?.close(); quelle = null; leiter?.beenden() }
 
 // Was mit jeder Nachricht passiert, egal ob sie vom Server-Stream oder vom lokalen Spielleiter kommt
 const EMPFANG = {
-  status: (s) => { status = s; if (!status) return; zeigeKlasse(); zeigeTafel(); zeigeWarte(status.warte) },
+  status: (s) => {
+    status = s
+    if (!status) { if (LAN_GAST && !$('raum').hidden) gast?.zurLobby(); return }   // LAN-Partie abgebrochen: zurueck in die Lobby
+    // LAN: sobald die Partie laeuft und das Geraet einen Platz hat, von der Lobby in den Raum
+    if (LAN_GAST && status.spieler && $('raum').hidden && status.phase !== 'ende') zurSpielansicht()
+    zeigeKlasse(); zeigeTafel(); zeigeWarte(status.warte)
+  },
   ereignis: (e) => zeigeEreignis(e),
   tippt: (d) => zeigeTippt(d.von, d.fertig),
   warte: (w) => zeigeWarte(w),
   hefte: (h) => zeigeHefte(h),
   deckel: (d) => { regie(d.text, 'ende'); $('fehler').textContent = d.text },
+  lobby: (d) => { gast?.lobby(d); gastgeber?.zeige(d) },
+  frist: (d) => regie(d.text, 'geheim'),
+  uebergeben: (d) => { quelle?.close(); quelle = null; gast?.weg(d.text) },
+  ersetzt: () => { quelle?.close(); quelle = null; $('fehler').textContent = 'Dieser Platz ist jetzt auf einem anderen Gerät offen. Lade neu, um hier weiterzuspielen.' },
 }
+function zurSpielansicht() { $('lan').hidden = true; $('start').hidden = true; $('raum').hidden = false; $('eingabe').hidden = false }
 function verbinde() {
   quelle?.close()
-  quelle = new EventSource('/ereignisse')
+  quelle = new EventSource(LAN_GAST ? ereignisUrl() : '/ereignisse')
   for (const [art, tu] of Object.entries(EMPFANG)) quelle.addEventListener(art, (m) => tu(JSON.parse(m.data)))
 }
 async function lokal() {
@@ -417,7 +454,14 @@ if (DEMO) {
 }
 
 // Laeuft schon eine Partie (Seite neu geladen)? Dann direkt rein.
-if (!DEMO) fetch('/status').then((r) => r.json()).then((s) => {
+if (LAN_GAST) {
+  document.body.classList.add('lan-gast')
+  $('neu').textContent = 'Zur Lobby'
+  gast = lanGast({ verbinde, zurSpielansicht })
+  gast.start().catch((f) => { $('lanfehler').textContent = f.message })
+} else if (!DEMO) fetch('/status').then((r) => r.json()).then((s) => {
   if (!s || s.phase === 'ende') return
-  status = s; frisch(); $('start').hidden = true; $('raum').hidden = false; $('eingabe').hidden = s.zuschauen; verbinde()
+  // LAN-Partie am Rechner des Gastgebers: nur Oeffentliches, keine Eingabe
+  status = s; frisch(); $('start').hidden = true; $('raum').hidden = false; $('eingabe').hidden = s.zuschauen || !s.spieler; $('neu').hidden = !s.lan; verbinde()
 }).catch(() => {})
+if (!DEMO && !LAN_GAST) lanGastgeber().then((g) => { gastgeber = g }).catch(() => {})
