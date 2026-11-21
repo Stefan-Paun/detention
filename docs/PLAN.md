@@ -102,6 +102,8 @@ nachsitzen/
 
 Nach M5 kamen aus der Tester-Runde (10 Agenten, 31.10.) drei Fassungen: **v1.1** (geheime Abstimmung, Nacht-1-Schutz, Vorzeigen, Nachbar-Sicht), **v1.2** (7 Spieler, Spur verwischen, Wahrheit am Ende, Hefte kürzer) und **v1.3** (Plätze mit Eigenwert: Tür hört, Tafel merkt den Durchgang, Pulte sehen links/rechts, Fenster zeigt alle; Untersuchen höchstens dreimal pro Partie; Opfer-Szenen mit Varianten; wer raus ist, sieht als Geist alles).
 
+**LAN-Modus** (Issue #21, Nachtschicht 21.11.): `--lan` bindet zusätzlich an die private WLAN-Adresse. Modell: eine Partie mit mehreren menschlichen Plätzen (`menschen` in der Partie, Nacht-1-Schutz für alle); jeder Platz ist ein `browserGehirn` mit Frist hinter einem `sitzGehirn`, das der Gastgeber an die KI übergeben kann. Der Server führt je SSE-Leitung eine Sicht: ein Platz sieht `sichtbar.includes(platz)`, Geister und der Rechner des Gastgebers nur Ereignisse mit mehr als einer Figur in `sichtbar` (privat ist immer genau eine). `warte`/`frist` gehen nur an den eigenen Platz. Über die LAN-Adresse nur Seite, Browser-Module und `/lan/*`; Start und Übergabe nur über 127.0.0.1. LAN-Partien ohne Hefte.
+
 Nach **M2** hast du etwas, das Spaß macht und das du zeigen kannst. Alles danach ist Kür. Realistisch bei Schule + Matura: M0–M2 bis Mitte November, M4 bis Weihnachten.
 
 ## 7. Risiken und wie wir sie klein halten
@@ -126,4 +128,4 @@ Nach **M2** hast du etwas, das Spaß macht und das du zeigen kannst. Alles danac
 
 ## 9. Nicht in v1
 
-Sprachausgabe der Figuren (später mit Jarvis-TTS), Mehrspieler mit Freunden online, weitere Sprachen, Handy-Layout, eigene Figuren-Editor. Alles möglich, aber erst nach M5.
+Sprachausgabe der Figuren (später mit Jarvis-TTS), Mehrspieler mit Freunden online (im eigenen WLAN geht es seit dem LAN-Modus), weitere Sprachen, Handy-Layout, eigene Figuren-Editor. Alles möglich, aber erst nach M5.
