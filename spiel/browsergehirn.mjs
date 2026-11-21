@@ -1,16 +1,48 @@
 // Das Gehirn des Menschen im Browser: jede Entscheidung ist ein Versprechen, das der Server
 // einloest, sobald die passende Aktion per POST /aktion ankommt. Ungueltige Aktionen werden
 // hier abgewiesen, damit die Spielschleife nie an einer Mensch-Eingabe scheitert.
+// LAN-Modus: `frist` (ms) beantwortet eine offene Frage nach Ablauf mit der Vorgabe (enthaelt sich,
+// schweigt, Platz per Zufall); `sende` geht dann nur an das Geraet dieses Platzes.
 
 import { SCHATTEN, SCHLUESSEL, PETZE } from './rollen.mjs'
 import { behauptungAus } from './welt.mjs'
 
-export function browserGehirn(name, rolle, { sende }) {
-  let offen = null          // { was, loese, weise }
+// Spielertext fuer den Verlauf: eine Zeile, ohne Steuerzeichen, ohne eckige Klammern (die sind im
+// Prompt der Figuren fuer Spielmeldungen wie [BEWEIS ...] reserviert), hoechstens 300 Zeichen.
+export function bereinigeText(roh) {
+  return String(roh ?? '').replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ').replace(/\[/g, '(').replace(/\]/g, ')').replace(/\s+/g, ' ').trim().slice(0, 300)
+}
+
+// Antwort, wenn die Frist ablaeuft: niemand wird beschuldigt, niemand untersucht, Platz und Ziel per Zufall.
+export function vorgabe(was, zahl = Math.random) {
+  const aus = (liste) => liste[Math.floor(zahl() * liste.length)]
+  switch (was.art) {
+    case 'sagen': return was.pflicht ? { art: 'sagt', text: '…', an: null, behauptet: null } : { art: 'schweigt' }
+    case 'nacht': return { platz: aus(was.orte), ziel: was.aufgabe === 'verstecken' ? undefined : aus(was.optionen), verwischen: false }
+    case 'untersuchen': return null
+    case 'zeigen': return false
+    case 'stimme': return { fuer: null }
+    default: return null
+  }
+}
+
+export function browserGehirn(name, rolle, { sende, frist = null, zahl = Math.random } = {}) {
+  let offen = null          // { was, loese, weise, wecker }
 
   const frage = (was) => new Promise((loese, weise) => {
-    offen = { was, loese, weise }
-    sende('warte', was)
+    const w = frist ? { ...was, frist: Math.round(frist / 1000) } : was
+    offen = { was: w, loese, weise, wecker: null }
+    if (frist) {
+      const meins = offen
+      meins.wecker = setTimeout(() => {
+        if (offen !== meins) return
+        offen = null
+        sende('warte', null)
+        sende('frist', { text: 'Die Zeit ist um. Du enthältst dich diesmal.' })
+        loese(vorgabe(w, zahl))
+      }, frist)
+    }
+    sende('warte', w)
   })
   const andere = (lebende) => lebende.filter((n) => n !== name)
 
@@ -33,7 +65,7 @@ export function browserGehirn(name, rolle, { sende }) {
       const { was } = offen
       let ergebnis
       if (was.art === 'sagen') {
-        const text = String(a.text || '').trim().slice(0, 300)
+        const text = bereinigeText(a.text)
         if (a.art === 'schweigt' || !text) {
           if (was.pflicht) return 'Sag zumindest einen Satz'
           ergebnis = { art: 'schweigt' }
@@ -54,7 +86,8 @@ export function browserGehirn(name, rolle, { sende }) {
         if (a.fuer != null && !was.optionen.includes(a.fuer)) return `${a.fuer} steht nicht zur Wahl (nicht im Raum oder du selbst). Möglich: ${was.optionen.join(', ')} oder niemand`
         ergebnis = { fuer: a.fuer ?? null }
       } else return 'Unbekannte Eingabe'
-      const { loese } = offen
+      const { loese, wecker } = offen
+      clearTimeout(wecker)
       offen = null
       sende('warte', null)
       loese(ergebnis)
@@ -63,8 +96,10 @@ export function browserGehirn(name, rolle, { sende }) {
 
     abbrechen() {
       if (!offen) return
-      const { weise } = offen
+      const { weise, wecker } = offen
+      clearTimeout(wecker)
       offen = null
+      sende('warte', null)
       weise(new Error('Partie abgebrochen'))
     },
   }

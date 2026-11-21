@@ -17,12 +17,13 @@ export const MAX_UNTERSUCHUNGEN = STANDARD_REGELN.maxUntersuchungen  // pro Figu
 
 // `regeln`: Abweichungen vom Standard (spiel/regeln.mjs), nur fuer Labor und Tests. `petze`/`petzeJede`
 // direkt in den Optionen gehen wie bisher und haben Vorrang (neu: petzeJede wird wie jede Regel geprueft, 1 bis 10).
-export function neuePartie(namen, zufall, { spieler = null, petze = null, petzeJede, regeln = null } = {}) {
+export function neuePartie(namen, zufall, { spieler = null, menschen = null, petze = null, petzeJede, regeln = null } = {}) {
   const r = regelnMit({ ...regeln, ...(petze != null ? { petze } : {}), ...(petzeJede != null ? { petzeJede } : {}) })
   const rollen = verteileRollen(namen, zufall, { petze: r.petze, petzeAb: r.petzeAb })
   const p = {
     namen: [...namen],
     spieler,                          // Name der menschlichen Figur (oder null = nur KI)
+    menschen: menschen ? [...menschen] : (spieler ? [spieler] : []),   // LAN-Modus: alle menschlichen Plaetze
     regeln: r,                        // eingefroren; Standard = STANDARD_REGELN
     rollen,
     lebende: [...namen],
@@ -128,11 +129,14 @@ export function platzWaehlen(p, wer, ort) {
   melde(p, 'platz', { wer, ort }, [wer])
 }
 
-// Wen der Schatten heute holen darf: nicht sich selbst, und in Nacht 1 nicht den Menschen
-// (sonst erlebt ein neuer Spieler sein erstes Spiel nur als Zuschauer).
+// Wen der Schatten heute holen darf: nicht sich selbst, und in Nacht 1 keinen Menschen
+// (sonst erlebt ein neuer Spieler sein erstes Spiel nur als Zuschauer). Bleibt sonst niemand, gilt der Schutz nicht.
 export function holbar(p) {
   const s = schatten(p)
-  return p.lebende.filter((n) => n !== s && !(p.nacht === 1 && n === p.spieler))
+  const alle = p.lebende.filter((n) => n !== s)
+  const geschuetzt = (n) => p.nacht === 1 && (n === p.spieler || (p.menschen ?? []).includes(n))
+  const frei = alle.filter((n) => !geschuetzt(n))
+  return frei.length ? frei : alle
 }
 
 export function darfVerwischen(p) { return !p.verwischtBenutzt }
