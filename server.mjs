@@ -2,6 +2,7 @@
 // per Server-Sent Events fuettert. Der API-Schluessel bleibt hier, der Browser sieht ihn nie.
 //   node server.mjs            http://localhost:4800
 //   NACHSITZEN_PORT=4801 node server.mjs
+//   node server.mjs --lan      zusaetzlich im eigenen WLAN: bis zu 4 Menschen mit Beitrittscode (siehe README)
 
 import http from 'node:http'
 import fs from 'node:fs'
@@ -20,6 +21,7 @@ import { hefteSpeicher } from './spiel/hefte.mjs'
 import { figurenSpeicher } from './spiel/figurenspeicher.mjs'
 import { pruefeFigur, kennung, MAX_EIGENE, GRENZEN } from './spiel/figurenschema.mjs'
 import { browserModule } from './tools/seite.mjs'
+import { lanLobby, sitzGehirn, ersatzFigur, lanAdresse, drossel, MAX_MENSCHEN } from './spiel/lan.mjs'
 
 const HIER = path.dirname(fileURLToPath(import.meta.url))
 let browserDateien = null   // Set der Module aus spiel/, die der Browser laden darf (tools/seite.mjs)
@@ -38,6 +40,9 @@ export function pruefePort(wert) {
 
 export const MAX_KI = 7, MIN_KI = 3   // plus Mensch oder Ben: 4 bis 8 Figuren wie in rollen.mjs
 const MAX_FIGUREN_KOERPER = 8_000       // Bytes fuer Routen unter /figuren
+const MAX_LAN_KOERPER = 2_000           // Bytes fuer Routen unter /lan
+const LAN_FRIST = 90_000                // ms je Entscheidung im LAN-Modus, danach enthaelt sich der Platz
+const LAN_HEMDEN = ['#bd93f9', '#8be9fd', '#ffb86c', '#50fa7b']   // Shirtfarben der Menschen im LAN-Modus
 
 // Herkunftspruefung fuer die Figuren-Routen (zusaetzlich zur Host-Pruefung): Ein Browser schickt bei
 // fremden Seiten Origin bzw. Sec-Fetch-Site mit; Skripte (curl, Tests) schicken oft keins von beiden.
@@ -50,20 +55,60 @@ export function herkunftOk(headers) {
 
 // gehirnFabrik(name, rolle, { mitspieler, spieler, zufall, figur }) -> Gehirn; im Test Skript-Gehirne statt Claude
 // figuren: Speicher fuer eigene Figuren (figurenSpeicher) oder null = Editor und eigene Figuren aus
-export function erstelleServer({ gehirnFabrik, hefte = null, figuren: eigene = null, host = '127.0.0.1', port = pruefePort(process.env.NACHSITZEN_PORT), pause = 700, startwert = null, log = console.log } = {}) {
-  const verbindungen = new Set()
-  let spiel = null          // { p, spieler, zuschauen, mensch, gesendet }
+// lan: null (Standard: nur 127.0.0.1) oder { adresse?, port?, frist?, code? } = zusaetzlich an die LAN-Adresse binden
+export function erstelleServer({ gehirnFabrik, hefte = null, figuren: eigene = null, host = '127.0.0.1', port = pruefePort(process.env.NACHSITZEN_PORT), pause = 700, startwert = null, log = console.log, lan = null } = {}) {
+  const verbindungen = new Map()   // res -> { lan, sitz }: lan = Geraet aus dem LAN-Modus (Sicht nur ueber seinen Platz)
+  let spiel = null          // { p, spieler, zuschauen, mensch, lan, menschen, gesendet }
   let partien = 0           // zaehlt die Partien; Teil der SSE-id, damit alte Nummern nicht zur neuen Partie passen
+  const lobby = lan ? lanLobby({ code: lan.code ?? null }) : null
+  const lanFrist = lan?.frist ?? LAN_FRIST
+  const lanRaten = drossel({ max: lan?.raten ?? 30, fensterMs: 10_000 })   // Anfragen je Platz (Token) in 10 s
+  let lanZiel = null        // { adresse, port } sobald der LAN-Server lauscht
 
   // Eine SSE-Zeile; Spielereignisse tragen ihre Nummer als `id:`, damit der Browser sie bei der
   // automatischen Wiederverbindung als Last-Event-ID zurueckschickt.
   const sseZeile = (art, daten, id = null) => `${id === null ? '' : `id: ${id}\n`}event: ${art}\ndata: ${JSON.stringify(daten)}\n\n`
+  const schreibe = (res, zeile) => { if (res.writableEnded) verbindungen.delete(res); else res.write(zeile) }
+  // Allgemeine Meldungen (tippt, deckel, hefte, warte der Einzelpartie): LAN-Geraete nur in einer LAN-Partie
   const sende = (art, daten) => {
-    const zeile = sseZeile(art, daten, art === 'ereignis' ? `${spiel.kennung}-${daten.nr}` : null)
-    for (const res of verbindungen) { if (res.writableEnded) verbindungen.delete(res); else res.write(zeile) }
+    const zeile = sseZeile(art, daten)
+    for (const [res, v] of verbindungen) if (!v.lan || spiel?.lan) schreibe(res, zeile)
   }
+  // Nur an die Geraete eines Platzes (LAN: warte und frist gehen nie an andere)
+  const sendeAn = (sitz, art, daten) => { const zeile = sseZeile(art, daten); for (const [res, v] of verbindungen) if (v.sitz === sitz && v.lan) schreibe(res, zeile) }
+  const sendeEreignis = (e) => { for (const [res, v] of verbindungen) if (darfSehen(v, e)) schreibe(res, sseZeile('ereignis', fuerBrowser(e), `${spiel.kennung}-${e.nr}`)) }
+  const sendeStatus = () => { for (const [res, v] of verbindungen) schreibe(res, sseZeile('status', status(v))) }
   let ping = null   // Kommentarzeile alle 25 s, damit Proxys und Browser die Leitung nicht kappen
-  const status = () => spiel && {
+  const LOKAL = { lan: false, sitz: null }
+  // Platz eines LAN-Geraets in der laufenden LAN-Partie (null: kein Mensch mehr, z. B. an die KI uebergeben)
+  const lanSitz = (v) => (v.lan && spiel?.lan && v.sitz && spiel.menschen.has(v.sitz) ? v.sitz : null)
+  // Was ein Geraet sehen darf. Einzelpartie: wie bisher (LAN-Geraete nichts). LAN-Partie: der eigene Platz
+  // sieht seine Ereignisse; verschwunden oder ohne Platz (Rechner des Gastgebers) nur Oeffentliches,
+  // also nie die privaten Nacht-Ereignisse anderer. Privat = genau eine Figur darf es sehen.
+  function darfSehen(v, e) {
+    if (!spiel.lan) return !v.lan && sichtbar(e)
+    const sitz = lanSitz(v)
+    if (v.lan && !sitz) return false
+    if (sitz && e.sichtbar.includes(sitz)) return true
+    return e.sichtbar.length > 1 && (!sitz || !spiel.p.lebende.includes(sitz))
+  }
+  const status = (v = LOKAL) => {
+    if (!spiel) return null
+    if (spiel.lan) return lanStatus(v)
+    if (v.lan) return null   // Einzelpartie am Rechner: LAN-Geraete sehen nichts davon
+    return einzelStatus()
+  }
+  function lanStatus(v) {
+    const p = spiel.p, sitz = lanSitz(v)
+    return {
+      phase: p.phase, nacht: p.nacht, runde: p.runde, lebende: p.lebende, keller: p.keller, verschwunden: p.verschwunden,
+      spieler: sitz, zuschauen: false, sieger: p.sieger, rolle: sitz ? p.rollen[sitz] : null, rollen: p.phase === 'ende' ? p.rollen : null,
+      figuren: spiel.figuren, warte: sitz ? spiel.menschen.get(sitz).aktuell.wartetAuf?.() ?? null : null, orte: ORT_NAMEN, klassenbuch: KLASSENBUCH,
+      hefte: false, hefteGeschrieben: false, geist: !!sitz && !p.lebende.includes(sitz), untersuchungenUebrig: sitz ? P.untersuchungenUebrig(p, sitz) : null,
+      lan: { menschen: [...spiel.menschen.keys()], frist: Math.round(lanFrist / 1000) },
+    }
+  }
+  const einzelStatus = () => spiel && {
     phase: spiel.p.phase, nacht: spiel.p.nacht, runde: spiel.p.runde, lebende: spiel.p.lebende, keller: spiel.p.keller,
     verschwunden: spiel.p.verschwunden, spieler: spiel.spieler, zuschauen: spiel.zuschauen, sieger: spiel.p.sieger,
     rolle: spiel.spieler ? spiel.p.rollen[spiel.spieler] : null,
@@ -94,6 +139,83 @@ export function erstelleServer({ gehirnFabrik, hefte = null, figuren: eigene = n
     })
   }
 
+  // Alte Partie stoppen (Schleife, Tippen, offene Fragen) und die neue laufen lassen
+  function laufen(meins, z) {
+    const alt = spiel
+    if (alt) { alt.beendet = true; if (alt.p.phase !== 'ende') alt.abbrechen() }
+    if (alt?.lan && lobby && !lobby.offen) lobby.oeffnen()
+    meins.kennung = ++partien
+    spiel = meins
+    const p = meins.p
+    const beobachter = (e) => { if (meins.beendet) return; sendeEreignis(e); sendeStatus() }
+    spieleBisZumEnde(p, meins.gehirne, { zufall: z, beobachter, abbruch: () => meins.beendet, pause: () => new Promise((f) => setTimeout(f, pause)) })
+      .then(() => { if (meins.lan) { if (!meins.beendet) lobby.oeffnen() } else return hefteSchreiben(meins) })
+      .catch((f) => {
+        log(`Partie beendet: ${f.message}`)
+        if (meins.beendet) return   // abgeloest durch eine neue Partie: nichts mehr senden
+        if (p.phase !== 'ende') { p.phase = 'ende'; p.sieger = p.sieger || null }
+        if (meins.lan && !lobby.offen) lobby.oeffnen()
+        sendeStatus()
+      })
+  }
+
+  // LAN-Partie aus der Lobby: alle menschlichen Plaetze plus KI-Figuren (Standard: zusammen 7, mindestens 3 KI).
+  // Ohne Hefte: die enthalten Urteile ueber den Gastgeber und gehen nie an fremde Geraete.
+  function neueLanPartie({ besetzung } = {}) {
+    if (!lobby.offen) throw Object.assign(new Error('Es läuft schon eine LAN-Partie'), { status: 409 })
+    const plaetze = lobby.plaetze
+    if (!plaetze.length) throw new Error('Noch niemand ist beigetreten')
+    if (plaetze.some((x) => !x.bereit)) throw new Error(`Noch nicht bereit: ${plaetze.filter((x) => !x.bereit).map((x) => x.name).join(', ')}`)
+    const menschenNamen = plaetze.map((x) => x.name)
+    const ki = besetzen(besetzung ?? KI_FIGUREN.slice(0, Math.max(MIN_KI, Math.min(KI_FIGUREN.length, 7 - menschenNamen.length))))
+    const namen = [...ki.map((f) => f.name), ...menschenNamen]
+    if (namen.length > 8) throw new Error(`Zu viele im Raum (${namen.length}); höchstens 8. Wähle weniger KI-Figuren.`)
+    if (new Set(namen.map((n) => n.toLowerCase())).size !== namen.length) throw new Error('Ein Name ist doppelt (Mensch und Figur)')
+    const z = zufall(startwert ?? Date.now())
+    const p = P.neuePartie(namen, z, { menschen: menschenNamen })
+    const datenVon = Object.fromEntries(ki.map((f) => [f.name, f]))
+    const figuren = Object.fromEntries(namen.map((n) => {
+      const i = menschenNamen.indexOf(n)
+      return [n, i >= 0 ? { haut: '#f1cfb0', haar: '#2b2118', frisur: 'wuschel', shirt: LAN_HEMDEN[i % LAN_HEMDEN.length] } : datenVon[n].aussehen]
+    }))
+    const gehirne = {}, menschen = new Map()
+    const meins = { p, spieler: null, zuschauen: false, mensch: null, lan: true, menschen, figuren, gehirne, hefteGeschrieben: false, beendet: false, z }
+    meins.abbrechen = () => { for (const s of menschen.values()) s.aktuell.abbrechen?.() }
+    for (const n of namen) {
+      if (!menschenNamen.includes(n)) {
+        gehirne[n] = mitTippen(gehirnFabrik(n, p.rollen[n], { mitspieler: namen, spieler: null, zufall: z, heft: '', figur: datenVon[n] }), n, meins)
+      } else {
+        const sitz = sitzGehirn(browserGehirn(n, p.rollen[n], { sende: (art, d) => { if (!meins.beendet) sendeAn(n, art, d) }, frist: lanFrist, zahl: z.zahl }))
+        menschen.set(n, sitz); gehirne[n] = sitz
+      }
+    }
+    lobby.schliessen()
+    laufen(meins, z)
+    return status()
+  }
+
+  // Gastgeber: Platz an die KI geben. In der Lobby heisst das nur: Platz freigeben.
+  function uebergeben(name) {
+    if (lobby.offen || !spiel?.lan || spiel.p.phase === 'ende') {
+      if (!lobby.entfernen(name)) throw Object.assign(new Error(`„${String(name).slice(0, 20)}“ sitzt nicht in der Lobby`), { status: 404 })
+      trennen(name); return { ok: true, lobby: true }
+    }
+    const sitz = spiel.menschen.get(name)
+    if (!sitz) throw Object.assign(new Error(`„${String(name).slice(0, 20)}“ ist kein menschlicher Platz`), { status: 404 })
+    const sp = spiel
+    const ki = mitTippen(gehirnFabrik(name, sp.p.rollen[name], { mitspieler: sp.p.namen, spieler: null, zufall: sp.z, heft: '', figur: ersatzFigur(name) }), name, sp)
+    sp.menschen.delete(name)
+    lobby.entfernen(name)
+    trennen(name)
+    sitz.uebergeben(ki)
+    sendeStatus()
+    return { ok: true, lobby: false }
+  }
+  // Geraete eines Platzes trennen (Token gilt nicht mehr)
+  function trennen(name) {
+    for (const [res, v] of verbindungen) if (v.lan && v.sitz === name) { res.write(sseZeile('uebergeben', { text: 'Dein Platz ist frei: Der Gastgeber hat ihn an die KI gegeben oder aus der Lobby genommen.' })); res.end(); verbindungen.delete(res) }
+  }
+
   function neuePartie({ name, zuschauen, besetzung }) {
     const spieler = zuschauen ? null : pruefeName(name)
     const ki = besetzen(besetzung)
@@ -104,7 +226,8 @@ export function erstelleServer({ gehirnFabrik, hefte = null, figuren: eigene = n
     const datenVon = Object.fromEntries(ki.map((f) => [f.name, f]))
     const figuren = Object.fromEntries(namen.map((n) => [n, n === spieler ? { haut: '#f1cfb0', haar: '#2b2118', frisur: 'wuschel', shirt: '#bd93f9' } : (datenVon[n] ?? ladeFigur(n)).aussehen]))
     const gehirne = {}
-    const meins = { p, spieler, zuschauen, mensch: null, figuren: figuren, gehirne, hefteGeschrieben: false, beendet: false }
+    const meins = { p, spieler, zuschauen, mensch: null, lan: false, figuren: figuren, gehirne, hefteGeschrieben: false, beendet: false }
+    meins.abbrechen = () => meins.mensch?.abbrechen()
     for (const n of namen) {
       if (n === spieler) { meins.mensch = browserGehirn(n, p.rollen[n], { sende }); gehirne[n] = meins.mensch }
       else {
@@ -112,17 +235,7 @@ export function erstelleServer({ gehirnFabrik, hefte = null, figuren: eigene = n
         gehirne[n] = mitTippen(g, n, meins)
       }
     }
-    if (spiel) { spiel.beendet = true; if (spiel.p.phase !== 'ende') spiel.mensch?.abbrechen() }   // alte Partie stoppt (Schleife, Tippen, Hefte)
-    meins.kennung = ++partien
-    spiel = meins
-    const beobachter = (e) => { if (meins.beendet) return; if (sichtbar(e)) sende('ereignis', fuerBrowser(e)); sende('status', status()) }
-    spieleBisZumEnde(p, gehirne, { zufall: z, beobachter, abbruch: () => meins.beendet, pause: () => new Promise((f) => setTimeout(f, pause)) })
-      .then(() => hefteSchreiben(meins))
-      .catch((f) => {
-        log(`Partie beendet: ${f.message}`)
-        if (meins.beendet) return   // abgeloest durch eine neue Partie: nichts mehr senden
-        if (p.phase !== 'ende') { p.phase = 'ende'; p.sieger = p.sieger || null } sende('status', status())
-      })
+    laufen(meins, z)   // alte Partie stoppt (Schleife, Tippen, Hefte)
     return status()
   }
 
@@ -145,7 +258,7 @@ export function erstelleServer({ gehirnFabrik, hefte = null, figuren: eigene = n
       sende('tippt', { von: n, fertig: true })
     }
     sp.hefteGeschrieben = true
-    sende('hefte', eintraege); sende('status', status())
+    sende('hefte', eintraege); sendeStatus()
   }
 
   // KI-Gehirne melden vorher "tippt", damit der Browser Leben zeigt
@@ -155,11 +268,119 @@ export function erstelleServer({ gehirnFabrik, hefte = null, figuren: eigene = n
     return { ...g, abend: h(g.abend), nacht: g.nacht, diskussion: h(g.diskussion), abstimmung: h(g.abstimmung) }
   }
 
-  const server = http.createServer(async (req, res) => {
+  // SSE-Leitung oeffnen und alles nachliefern, was dieses Geraet sehen darf
+  function oeffneStrom(req, res, v) {
+    res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' })
+    verbindungen.set(res, v)
+    req.on('close', () => verbindungen.delete(res))
+    if (spiel) {
+      // Last-Event-ID ("<partie>-<nr>"): nur Neueres nachliefern, aber nur aus derselben Partie.
+      // Fremde Partie, Unsinn oder eine Nummer, die es noch nicht gibt, liefert alles.
+      // Eine blanke Zahl (curl, Skripte) gilt fuer die laufende Partie.
+      const m = /^(?:(\d+)-)?(\d+)$/.exec(req.headers['last-event-id'] ?? '')
+      const gueltig = m && (m[1] === undefined || Number(m[1]) === spiel.kennung) && Number(m[2]) < spiel.p.ereignisse.length
+      const letzte = gueltig ? Number(m[2]) : -1
+      res.write(sseZeile('status', status(v)))   // zuerst, damit der Browser weiss, wer er ist
+      for (const e of spiel.p.ereignisse) if (e.nr > letzte && darfSehen(v, e)) res.write(sseZeile('ereignis', fuerBrowser(e), `${spiel.kennung}-${e.nr}`))
+      res.write(sseZeile('status', status(v)))
+    } else res.write(sseZeile('status', null))
+  }
+
+  // Routen unter /lan. viaLan = Anfrage kam ueber die LAN-Adresse (Gast), sonst ueber 127.0.0.1 (Gastgeber).
+  async function lanRoute(req, res, url, viaLan) {
+    const antwort = (st, daten) => res.writeHead(st, { 'content-type': 'application/json', 'cache-control': 'no-store' }).end(JSON.stringify(daten))
+    const pfad = url.pathname
+    if (req.method === 'POST') {
+      if (!/^application\/json(;|$)/i.test(req.headers['content-type'] || '')) { antwort(415, { ok: false, fehler: 'Nur application/json' }); return }
+      if (!viaLan && !herkunftOk(req.headers)) { antwort(403, { ok: false, fehler: 'Fremde Herkunft' }); return }
+    }
+    // Token: Kopfzeile (fetch) oder ?token= (EventSource kann keine Kopfzeilen); POST nur per Kopfzeile
+    const token = req.headers['x-nachsitzen-token'] || (req.method === 'GET' ? url.searchParams.get('token') : null)
+    const platz = lobby.sitzVon(token)
+    if (platz && !lanRaten.erlaubt(platz.token)) { antwort(429, { ok: false, fehler: 'Zu viele Anfragen. Kurz warten.' }); return }
+
+    if (req.method === 'POST' && pfad === '/lan/beitreten') {
+      const body = await lies(req, MAX_LAN_KOERPER)
+      const r = lobby.beitreten({ code: body.code, name: body.name, adresse: req.socket.remoteAddress, lokal: !viaLan })
+      sendeLobby()
+      antwort(200, { ok: true, ...r })
+      return
+    }
+    if (req.method === 'GET' && pfad === '/lan/lobby') {
+      if (viaLan && !platz) { antwort(403, { ok: false, fehler: 'Unbekannter Platz. Tritt mit dem Code bei.' }); return }
+      antwort(200, lobbyDaten(viaLan ? null : 'gastgeber', platz))
+      return
+    }
+    if (req.method === 'POST' && (pfad === '/lan/start' || pfad === '/lan/uebergeben')) {
+      if (viaLan) { res.writeHead(404).end('nicht gefunden'); return }
+      const body = await lies(req, MAX_LAN_KOERPER)
+      if (pfad === '/lan/start') { neueLanPartie(body); antwort(200, { ok: true }) }
+      else antwort(200, uebergeben(body.name))
+      sendeLobby()
+      return
+    }
+    // Ab hier nur mit gueltigem Platz
+    if (!platz) { antwort(403, { ok: false, fehler: 'Unbekannter Platz. Tritt mit dem Code bei.' }); return }
+    if (req.method === 'POST' && pfad === '/lan/bereit') {
+      const body = await lies(req, MAX_LAN_KOERPER)
+      lobby.bereit(token, body.bereit !== false)
+      sendeLobby()
+      antwort(200, { ok: true })
+      return
+    }
+    if (req.method === 'POST' && pfad === '/lan/aktion') {
+      const body = await lies(req, MAX_LAN_KOERPER)
+      const sitz = spiel?.lan && spiel.p.phase !== 'ende' ? spiel.menschen.get(platz.name) : null
+      const fehler = sitz ? (sitz.aktuell.aktion ? sitz.aktuell.aktion(body) : 'Deinen Platz spielt jetzt die KI') : 'Keine laufende LAN-Partie'
+      antwort(fehler ? 400 : 200, { ok: !fehler, fehler })
+      return
+    }
+    if (req.method === 'GET' && pfad === '/lan/ereignisse') {
+      // hoechstens 3 Leitungen je Platz (Handy, Tablet, neu geladen); die aelteste faellt weg
+      const meine = [...verbindungen].filter(([, v]) => v.lan && v.sitz === platz.name)
+      for (const [r] of meine.slice(0, Math.max(0, meine.length - 2))) { r.end(); verbindungen.delete(r) }
+      oeffneStrom(req, res, { lan: true, sitz: platz.name })
+      res.write(sseZeile('lobby', lobbyDaten(null, platz)))
+      return
+    }
+    if (req.method === 'GET' && pfad === '/lan/verlauf') {
+      const v = { lan: true, sitz: platz.name }
+      const ab = Number(url.searchParams.get('ab') || 0)
+      const liste = spiel ? spiel.p.ereignisse.filter((e) => e.nr >= ab && darfSehen(v, e)).map(fuerBrowser) : []
+      antwort(200, { ereignisse: liste, status: status(v) })
+      return
+    }
+    res.writeHead(404).end('nicht gefunden')
+  }
+
+  // Lobby fuer die Anzeige. Der Gastgeber am Rechner sieht Code und Adresse, Gaeste nie.
+  function lobbyDaten(wer, platz) {
+    const d = { offen: lobby.offen, plaetze: lobby.liste(), max: MAX_MENSCHEN, ich: platz?.name ?? null, laeuft: !!spiel?.lan && spiel.p.phase !== 'ende', frist: Math.round(lanFrist / 1000) }
+    if (wer === 'gastgeber') Object.assign(d, { gastgeber: true, code: lobby.code, adresse: lanZiel ? `http://${lanZiel.adresse}:${lanZiel.port}/?lan=1` : null, menschen: spiel?.lan ? [...spiel.menschen.keys()] : [] })
+    return d
+  }
+  const sendeLobby = () => { if (!lobby) return; for (const [res, v] of verbindungen) schreibe(res, sseZeile('lobby', v.lan ? lobbyDaten(null, lobby.plaetze.find((x) => x.name === v.sitz)) : lobbyDaten('gastgeber', null))) }
+
+  async function behandle(req, res, viaLan) {
     const hostKopf = req.headers.host || ''
-    if (!/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(hostKopf)) { res.writeHead(403).end('nur lokal'); return }
+    const hostOk = viaLan
+      ? lanZiel && new RegExp(`^${lanZiel.adresse.replace(/\./g, '\\.')}(:${lanZiel.port})?$`).test(hostKopf)
+      : /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(hostKopf)
+    if (!hostOk) { res.writeHead(403).end(viaLan ? 'falsche Adresse' : 'nur lokal'); return }
     const url = new URL(req.url, `http://${hostKopf}`)
     try {
+      if (url.pathname.startsWith('/lan/')) {
+        if (!lobby) { res.writeHead(404).end('nicht gefunden'); return }
+        await lanRoute(req, res, url, viaLan)
+        return
+      }
+      // Ueber die LAN-Adresse gibt es sonst nur die statische Seite und die Browser-Module (Liste, keine Ausnahmen):
+      // Figuren, Hefte, Einzelpartie und Status bleiben auf diesem Rechner
+      if (viaLan) {
+        if (req.method !== 'GET') { res.writeHead(405).end(); return }
+        if (url.pathname.startsWith('/spiel/')) browserModul(url, res); else statisch(url, res)
+        return
+      }
       if (url.pathname === '/figuren' || url.pathname.startsWith('/figuren/')) {
         if (!eigene) { res.writeHead(404, { 'content-type': 'application/json' }).end(JSON.stringify({ ok: false, fehler: 'Eigene Figuren sind abgeschaltet' })); return }
         if (!herkunftOk(req.headers)) { res.writeHead(403, { 'content-type': 'application/json' }).end(JSON.stringify({ ok: false, fehler: 'Fremde Herkunft' })); return }
@@ -192,20 +413,8 @@ export function erstelleServer({ gehirnFabrik, hefte = null, figuren: eigene = n
         return
       }
       if (req.method === 'GET' && url.pathname === '/ereignisse') {
-        res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' })
-        verbindungen.add(res)
-        req.on('close', () => verbindungen.delete(res))
-        if (spiel) {
-          // Last-Event-ID ("<partie>-<nr>"): nur Neueres nachliefern, aber nur aus derselben Partie.
-          // Fremde Partie, Unsinn oder eine Nummer, die es noch nicht gibt, liefert alles.
-          // Eine blanke Zahl (curl, Skripte) gilt fuer die laufende Partie.
-          const m = /^(?:(\d+)-)?(\d+)$/.exec(req.headers['last-event-id'] ?? '')
-          const gueltig = m && (m[1] === undefined || Number(m[1]) === spiel.kennung) && Number(m[2]) < spiel.p.ereignisse.length
-          const letzte = gueltig ? Number(m[2]) : -1
-          res.write(sseZeile('status', status()))   // zuerst, damit der Browser weiss, wer er ist
-          for (const e of spiel.p.ereignisse) if (e.nr > letzte && sichtbar(e)) res.write(sseZeile('ereignis', fuerBrowser(e), `${spiel.kennung}-${e.nr}`))
-          res.write(sseZeile('status', status()))
-        } else res.write(sseZeile('status', null))
+        oeffneStrom(req, res, { lan: false, sitz: null })
+        if (lobby) res.write(sseZeile('lobby', lobbyDaten('gastgeber', null)))
         return
       }
       if (req.method === 'POST' && url.pathname === '/partie') {
@@ -229,7 +438,7 @@ export function erstelleServer({ gehirnFabrik, hefte = null, figuren: eigene = n
       if (req.method === 'GET' && url.pathname === '/verlauf') {
         // Alle sichtbaren Ereignisse ab ?ab=<nr> als JSON (fuer Skripte und Tests ohne SSE)
         const ab = Number(url.searchParams.get('ab') || 0)
-        const liste = spiel ? spiel.p.ereignisse.filter((e) => e.nr >= ab && sichtbar(e)).map(fuerBrowser) : []
+        const liste = spiel ? spiel.p.ereignisse.filter((e) => e.nr >= ab && darfSehen(LOKAL, e)).map(fuerBrowser) : []
         res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ ereignisse: liste, status: status() }))
         return
       }
@@ -237,45 +446,65 @@ export function erstelleServer({ gehirnFabrik, hefte = null, figuren: eigene = n
         res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(status()))
         return
       }
-      if (req.method === 'GET' && url.pathname.startsWith('/spiel/')) {
-        // Nur die Spielregeln, die die Browser-Demo (public/lokal.js, ?demo=1) importiert; nichts mit Dateien oder Schluesseln
-        const rel = url.pathname.slice(1)
-        if (!(browserDateien ??= new Set(browserModule())).has(rel)) { res.writeHead(404).end('nicht gefunden'); return }
-        res.writeHead(200, { 'content-type': MIME['.js'] }).end(fs.readFileSync(path.join(HIER, rel)))
-        return
-      }
-      if (req.method === 'GET') {
-        const datei = path.normalize(path.join(OEFFENTLICH, url.pathname === '/' ? 'index.html' : url.pathname))
-        if (!datei.startsWith(OEFFENTLICH) || !fs.existsSync(datei) || fs.statSync(datei).isDirectory()) { res.writeHead(404).end('nicht gefunden'); return }
-        res.writeHead(200, { 'content-type': MIME[path.extname(datei)] || 'application/octet-stream' }).end(fs.readFileSync(datei))
-        return
-      }
+      if (req.method === 'GET' && url.pathname.startsWith('/spiel/')) { browserModul(url, res); return }
+      if (req.method === 'GET') { statisch(url, res); return }
       res.writeHead(405).end()
     } catch (f) {
       if (res.headersSent) { res.end(); return }
       res.writeHead(f.status || 400, { 'content-type': 'application/json' }).end(JSON.stringify({ ok: false, fehler: f.message }))
     }
+  }
+  const server = http.createServer((req, res) => behandle(req, res, false))
+  const lanServer = lan ? http.createServer((req, res) => behandle(req, res, true)) : null
+  const lausche = (srv, p, h) => new Promise((f, w) => {
+    srv.once('error', (fehler) => {
+      if (fehler.code === 'EADDRINUSE') w(new Error(`Port ${p} ist belegt – starte mit NACHSITZEN_PORT=${p + 1} npm start`))
+      else if (fehler.code === 'EACCES') w(new Error(`Keine Berechtigung für Port ${p} – wähle einen Port über 1024, z. B. NACHSITZEN_PORT=4801 npm start`))
+      else if (fehler.code === 'EADDRNOTAVAIL') w(new Error(`Die Adresse ${h} gibt es auf diesem Rechner nicht`))
+      else w(fehler)
+    })
+    srv.listen(p, h, () => f(srv.address().port))
   })
 
   return {
     server,
     melde: (art, daten) => sende(art, daten),
-    starten: () => new Promise((f, w) => {
-      server.once('error', (fehler) => {
-        if (fehler.code === 'EADDRINUSE') w(new Error(`Port ${port} ist belegt – starte mit NACHSITZEN_PORT=${port + 1} npm start`))
-        else if (fehler.code === 'EACCES') w(new Error(`Keine Berechtigung für Port ${port} – wähle einen Port über 1024, z. B. NACHSITZEN_PORT=4801 npm start`))
-        else w(fehler)
-      })
-      server.listen(port, host, () => {
-        clearInterval(ping)
-        ping = setInterval(() => { for (const res of verbindungen) res.write(': ping\n\n') }, 25_000)
-        ping.unref()
-        f(server.address().port)
-      })
+    starten: async () => {
+      const lokalPort = await lausche(server, port, host)
+      if (lanServer) {
+        const adresse = lan.adresse ?? lanAdresse()
+        if (!adresse) { server.close(); throw new Error('Keine WLAN-Adresse gefunden (192.168.x.x, 10.x.x.x oder 172.16-31.x.x). Ohne --lan läuft das Spiel nur auf diesem Rechner.') }
+        try { lanZiel = { adresse, port: await lausche(lanServer, lan.port ?? lokalPort, adresse) } } catch (f) { server.close(); throw f }
+      }
+      clearInterval(ping)
+      ping = setInterval(() => { for (const res of verbindungen.keys()) res.write(': ping\n\n') }, 25_000)
+      ping.unref()
+      return lokalPort
+    },
+    schliessen: () => new Promise((f) => {
+      clearInterval(ping); for (const r of verbindungen.keys()) r.end(); if (spiel) { spiel.beendet = true; spiel.abbrechen?.() }
+      let offen = lanServer?.listening ? 2 : 1
+      const fertig = () => { if (--offen === 0) f() }
+      server.close(fertig); if (lanServer?.listening) lanServer.close(fertig)
+      server.closeAllConnections(); lanServer?.closeAllConnections()   // SSE-Leitungen nicht bis zum Keep-alive-Ende offen halten
     }),
-    schliessen: () => new Promise((f) => { clearInterval(ping); for (const r of verbindungen) r.end(); if (spiel) spiel.beendet = true; spiel?.mensch?.abbrechen(); server.close(() => f()) }),
     partie: () => spiel?.p ?? null,
+    // LAN-Modus: { adresse, port, code } oder null
+    lan: () => (lobby && lanZiel ? { ...lanZiel, code: lobby.code } : null),
   }
+}
+
+// Nur die Spielregeln, die die Browser-Demo (public/lokal.js, ?demo=1) importiert; nichts mit Dateien oder Schluesseln
+function browserModul(url, res) {
+  const rel = url.pathname.slice(1)
+  if (!(browserDateien ??= new Set(browserModule())).has(rel)) { res.writeHead(404).end('nicht gefunden'); return }
+  res.writeHead(200, { 'content-type': MIME['.js'] }).end(fs.readFileSync(path.join(HIER, rel)))
+}
+// Dateien aus public/, ohne Ausbruch aus dem Ordner
+function statisch(url, res) {
+  const datei = path.normalize(path.join(OEFFENTLICH, url.pathname === '/' ? 'index.html' : url.pathname))
+  if (!datei.startsWith(OEFFENTLICH) || !fs.existsSync(datei) || fs.statSync(datei).isDirectory()) { res.writeHead(404).end('nicht gefunden'); return }
+  res.writeHead(200, { 'content-type': MIME[path.extname(datei)] || 'application/octet-stream' }).end(fs.readFileSync(datei))
 }
 
 // Koerper lesen, hoechstens `max` Bytes; zu gross -> Fehler mit Status 413 (der Rest wird verworfen)
@@ -294,13 +523,27 @@ function lies(req, max = 10_000) {
 }
 
 // --- Start von der Kommandozeile: echte Claude-Gehirne ----------------------------------
+// LAN-Modus nur mit Schalter: --lan oder NACHSITZEN_LAN=1 (Adresse notfalls per NACHSITZEN_LAN_ADRESSE)
+export function lanAusStart(argv = process.argv, env = process.env) {
+  if (!argv.includes('--lan') && env.NACHSITZEN_LAN !== '1') return null
+  return { adresse: env.NACHSITZEN_LAN_ADRESSE || undefined }
+}
+function lanMelden(s) {
+  const l = s.lan()
+  if (!l) return
+  console.log(`\n  LAN-Modus (nur im eigenen WLAN!): Mitspieler öffnen http://${l.adresse}:${l.port}/?lan=1`)
+  console.log(`  Beitrittscode: ${l.code}   (höchstens 4 Menschen; Lobby und Start auf http://localhost:${s.server.address().port})\n`)
+}
+
 if (process.argv[1] && import.meta.url.endsWith(path.basename(process.argv[1]))) {
   try {
+  const lan = lanAusStart()
   if (process.argv.includes('--skript')) {
     // Ohne KI und ohne Kosten: Skript-Gehirne, zum Entwickeln der Oberflaeche
     const { skriptGehirn } = await import('./tools/skriptgehirne.mjs')
-    const s = erstelleServer({ gehirnFabrik: (name, rolle, { zufall: z }) => skriptGehirn(name, rolle, z), pause: 900, figuren: figurenSpeicher() })
+    const s = erstelleServer({ gehirnFabrik: (name, rolle, { zufall: z }) => skriptGehirn(name, rolle, z), pause: 900, figuren: figurenSpeicher(), lan })
     console.log(`Nachsitzen (Skript-Modus, keine KI) laeuft auf http://localhost:${await s.starten()}`)
+    lanMelden(s)
   } else {
   const deckel = deckelAusUmgebung()
   const kosten = kostenRechner({ deckel })
@@ -311,9 +554,10 @@ if (process.argv[1] && import.meta.url.endsWith(path.basename(process.argv[1])))
     console.log(`  (${m})`)
     if (m.includes('Tagesdeckel') && !deckelGemeldet) { deckelGemeldet = true; s.melde('deckel', { text: 'Der Tagesdeckel für die KI-Aufrufe ist erreicht. Die Figuren schweigen ab jetzt, bis morgen (oder du erhöhst NACHSITZEN_DECKEL).' }) }
   } })
-  const s = erstelleServer({ gehirnFabrik: fabrik, hefte: hefteSpeicher(), figuren: figurenSpeicher() })
+  const s = erstelleServer({ gehirnFabrik: fabrik, hefte: hefteSpeicher(), figuren: figurenSpeicher(), lan })
   const port = await s.starten()
   console.log(`Nachsitzen laeuft auf http://localhost:${port}`)
+  lanMelden(s)
   const t = kosten.heute()
   if (t.aufrufe) console.log(`Heute bisher: ${t.aufrufe} Aufrufe, ${(t.dollar * 100).toFixed(1)} Cent`)
   }
