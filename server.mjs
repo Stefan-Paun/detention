@@ -143,7 +143,7 @@ export function erstelleServer({ gehirnFabrik, hefte = null, figuren: eigene = n
   function laufen(meins, z) {
     const alt = spiel
     if (alt) { alt.beendet = true; if (alt.p.phase !== 'ende') alt.abbrechen() }
-    if (alt?.lan && lobby && !lobby.offen) lobby.oeffnen()
+    if (alt?.lan && !meins.lan && lobby && !lobby.offen) lobby.oeffnen()   // Einzelpartie loest eine LAN-Partie ab: Lobby wieder auf
     meins.kennung = ++partien
     spiel = meins
     const p = meins.p

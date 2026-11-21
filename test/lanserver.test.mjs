@@ -288,3 +288,23 @@ test('LAN: Ratenlimit und Groessenlimit je Platz', async () => {
     assert.equal(r.status, 413)
   } finally { await s.schliessen() }
 })
+
+test('LAN: zweite Runde – neuer Code, Plaetze bleiben, Lobby waehrend der Partie zu', async () => {
+  const { s, lokal, gast, code } = await lanServer({ lan: { frist: 20 } })
+  try {
+    const a = (await beitreten(gast, code, 'Ada')).body
+    const runde = async () => {
+      await anfrage(gast, '/lan/bereit', { methode: 'POST', body: { bereit: true }, token: a.token })
+      assert.equal((await anfrage(lokal, '/lan/start', { methode: 'POST', body: {} })).status, 200)
+      assert.equal((await anfrage(lokal, '/lan/lobby')).body.offen, false, 'Lobby zu, solange die Partie laeuft')
+      for (let i = 0; i < 300 && s.partie().phase !== 'ende'; i++) await new Promise((f) => setTimeout(f, 20))
+      for (let i = 0; i < 50 && !(await anfrage(lokal, '/lan/lobby')).body.offen; i++) await new Promise((f) => setTimeout(f, 20))
+    }
+    await runde()
+    const zweiterCode = (await anfrage(lokal, '/lan/lobby')).body.code
+    assert.equal(s.lan().code, zweiterCode)
+    assert.equal((await anfrage(gast, '/lan/lobby', { token: a.token })).body.plaetze[0].bereit, false, 'nach der Partie wieder nicht bereit')
+    await runde()
+    assert.equal(s.partie().phase, 'ende')
+  } finally { await s.schliessen() }
+})
