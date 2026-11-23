@@ -192,3 +192,25 @@ export function klasseAnimator(canvas) {
     },
   }
 }
+
+// --- Beschreibung fuer Screenreader ----------------------------------------------------------
+// Ein Satz zum Stand der Szene fuer das aria-label des Canvas (testbar ohne Browser).
+// z: { phase, nacht, lebende, verschwunden, keller, spieler, plaetze }
+const BEI_ORT = { 'Tür': 'an der Tür', 'Tafel': 'an der Tafel', 'Pulte': 'bei den Pulten', 'Fenster': 'am Fenster' }
+export function beschreibeSzene(z) {
+  const du = (n) => (n === z.spieler ? 'du' : n)
+  const liste = (l) => l.map(du).join(', ')
+  const teile = []
+  const kopf = z.phase === 'ende' ? 'Die Partie ist vorbei' : z.nacht ? `${z.phase === 'nacht' ? 'Nacht' : 'Tag'} ${z.nacht}` : 'Abend'
+  const lebende = z.lebende || []
+  if ((z.phase === 'nacht' || z.phase === 'morgen') && z.plaetze) {
+    const proOrt = {}
+    for (const n of lebende) { const o = z.plaetze[n]; if (o) (proOrt[o] ||= []).push(n) }
+    for (const o of Object.keys(BEI_ORT)) if (proOrt[o]) teile.push(`${BEI_ORT[o]}: ${liste(proOrt[o])}`)
+    const unbekannt = lebende.filter((n) => !z.plaetze[n])
+    if (unbekannt.length) teile.push(`Platz unbekannt: ${liste(unbekannt)}`)
+  } else if (lebende.length) teile.push(`im Raum: ${liste(lebende)}`)
+  if (z.verschwunden?.length) teile.push(`verschwunden: ${liste(z.verschwunden)}`)
+  if (z.keller?.length) teile.push(`im Keller: ${liste(z.keller)}`)
+  return `Das Klassenzimmer. ${kopf}${teile.length ? `, ${teile.join('; ')}` : ''}.`
+}

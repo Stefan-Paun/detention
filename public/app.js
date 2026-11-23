@@ -1,7 +1,7 @@
 // Nachsitzen im Browser: Verlauf aus Sicht des Spielers, Spurentafel (Raumplan, Wissen, Funde),
 // Pixel-Avatare und Eingaben an den Server. Alles Deutsch, keine Abhaengigkeiten.
 
-import { layout, zeichneFigur, klasseAnimator, waehleSchreck } from './klasse.js'
+import { layout, zeichneFigur, klasseAnimator, waehleSchreck, beschreibeSzene } from './klasse.js'
 import { tonAnlage } from './ton.js'
 import { starteEditor, besetzung } from './editor.js'
 import { farbeFuer } from './besetzung.js'
@@ -200,6 +200,7 @@ function zeigeSzene() {
   const namen = Object.keys(status.figuren || {})
   if (!pulte) { pulte = {}; namen.forEach((n, i) => { pulte[n] = i }) }
   const l = layout({ phase: status.phase, namen, lebende: status.lebende, verschwunden: status.verschwunden, keller: status.keller, spieler: status.spieler, zuschauen: status.zuschauen, plaetze: wissen.plaetze, opfer: wissen.opfer, pulte })
+  $('szene').setAttribute('aria-label', beschreibeSzene({ phase: status.phase, nacht: status.nacht, lebende: status.lebende, verschwunden: status.verschwunden, keller: status.keller, spieler: status.spieler, plaetze: wissen.plaetze }))
   szene.setze({ layout: l, looks: status.figuren, spieler: status.spieler, spur: wissen.spur, staub: new Set([...wissen.staub, ...wissen.durchgang]), zettel: !!wissen.zettel, sprecher, ende: status.phase === 'ende', phase: status.phase, daemmerung: einstellungen.daemmerung })
 }
 
@@ -329,6 +330,7 @@ function zeigeWarte(w) {
       let verwischen = false
       if (w.verwischen) { const b = knopf(wahl, 'Spur verwischen: aus', () => { verwischen = !verwischen; b.textContent = `Spur verwischen: ${verwischen ? 'an' : 'aus'}`; b.classList.toggle('leise', !verwischen) }, 'leise'); b.title = 'Einmal pro Partie. Keine Richtung, kein Kreidestaub, aber Nachbarn merken, dass du lange weg warst.' }
       for (const n of w.optionen) knopf(wahl, n, () => sende({ platz: o, ziel: n, verwischen }))
+      wahl.querySelector('button')?.focus()
     })
   } else if (w.art === 'zeigen') {
     hinweis.textContent = `Willst du dein Ergebnis allen vorzeigen? „${w.ergebnis}“ Vorgezeigt gilt es als bewiesen.`
@@ -343,6 +345,7 @@ function zeigeWarte(w) {
     for (const n of w.optionen) knopf(wahl, n, () => sende({ fuer: n }))
     knopf(wahl, 'niemand', () => sende({ fuer: null }), 'leise')
   }
+  wahl.querySelector('button')?.focus()
 }
 function knopf(wo, text, tu, extra = '') { const b = document.createElement('button'); b.className = `knopf ${extra}`; b.type = 'button'; b.textContent = text; b.onclick = tu; wo.appendChild(b); return b }
 function ortKnopf(wo, ort, tu) {
