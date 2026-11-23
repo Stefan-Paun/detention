@@ -149,7 +149,7 @@ function zeigeEreignis(e) {
       if (e.name === ich) regie('Du bist verschwunden. Als Geist siehst du ab jetzt alles: jeden Platz, jede Beobachtung, jeden Zettel. Die Spurentafel füllt sich von selbst.', 'ende'); break
     case 'fund': kartenZeile(karten.morgen || (karten.morgen = karte('morgen', `Morgen ${e.nacht}`)), e.text, e.typ === 'notiz' ? 'fund notiz' : 'fund'); break
     case 'zettel': kartenZeile(karten.morgen || (karten.morgen = karte('morgen', `Morgen ${e.nacht}`)), `Ein Zettel unter der Tür: „${e.text}“`, 'fund'); break
-    case 'hausmeister': case 'glocke': case 'stromausfall': kartenZeile(karten.morgen || (karten.morgen = karte('morgen', `Morgen ${e.nacht}`)), e.text, 'ereignis'); break
+    case 'hausmeister': case 'glocke': case 'stromausfall': kartenZeile(karten.morgen || (karten.morgen = karte('morgen', `Morgen ${e.nacht}`)), e.text, 'ereignis'); if (e.art === 'stromausfall') dunkel = true; break
     case 'untersucht': blase(e.von, `${e.von === ich ? 'Du untersuchst' : 'untersucht'} ${e.ort === status?.klassenbuch ? 'das Klassenbuch' : `den Platz ${BEI[e.ort] || e.ort}`}.`, { still: true }); break
     case 'beweis': regie(`Beweis, vorgezeigt von ${e.von === ich ? 'dir' : e.von} (vom Spiel geprüft): ${e.text}`, 'beweis'); break
     case 'zettelwahl': regie(`Zettel aufgedeckt: ${Object.entries(e.stimmen).map(([v, f]) => `${v === ich ? 'du' : v} → ${f ?? 'niemand'}`).join(' · ')}`, 'schwer'); break
