@@ -119,7 +119,7 @@ test('Sichtbarkeit: Rollen, Platz, Nachtwahl, Pruefung, Beobachtungen und Unters
   assert.ok(weg.text.includes(opfer) && weg.text.includes('Tintenfle'), 'Opfer-Szene nennt den Namen und bleibt bei Tinte')
   assert.equal(weg.ort, p.ereignisse.find((e) => e.art === 'platz' && e.wer === opfer).ort)
   P.sprechen(p, u, 'Wer war bei der Tür?', null)
-  const letzte = p.ereignisse.at(-1)
+  const letzte = p.ereignisse.findLast((e) => e.art === 'sagt')   // bei Stromausfall folgt noch das private 'im-dunkeln'
   assert.ok(letzte.sichtbar.includes(k) && !letzte.sichtbar.includes(opfer), 'Verschwundene hören nichts mehr')
   assert.ok(P.verlaufFuer(p, opfer).some((e) => e.art === 'sagt' && e.von === 'Mira'), 'aber den Abend davor haben sie noch mitbekommen')
 })

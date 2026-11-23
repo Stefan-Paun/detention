@@ -203,7 +203,7 @@ test('Sichtbarkeit (Ende): Die Wahrheit am Ende nennt Rollen und Naechte, aber k
   const w = p.ereignisse.find((e) => e.art === 'wahrheit')
   assert.ok(w)
   assert.ok(!JSON.stringify(w).includes('petze-prueft'))
-  assert.deepEqual(Object.keys(w).sort(), ['art', 'naechte', 'nacht', 'phase', 'nr', 'rollen', 'sichtbar'].sort())
+  assert.deepEqual(Object.keys(w).sort(), ['art', 'imDunkeln', 'naechte', 'nacht', 'phase', 'nr', 'rollen', 'sichtbar'].sort())
   for (const n of w.naechte) assert.deepEqual(Object.keys(n).sort(), ['nacht', 'opfer', 'plaetze', 'schatten', 'verwischt'])
   assert.ok(!JSON.stringify(P.zusammenfassung(p)).includes('petze'))
 })

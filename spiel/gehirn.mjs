@@ -118,7 +118,9 @@ export function verlaufAlsText(ereignisse, ich) {
       case 'verschwunden': zeilen.push(`[Morgen ${e.nacht}] ${e.text}`); break
       case 'fund': zeilen.push(`[Morgen ${e.nacht}, Fund für alle sichtbar] ${e.text}`); break
       case 'zettel': zeilen.push(`[Morgen ${e.nacht}] Ein Zettel liegt unter der Tür, alle lesen ihn: „${e.text}“`); break
-      case 'hausmeister': case 'glocke': zeilen.push(`[Morgen ${e.nacht}] ${e.text}`); break
+      case 'hausmeister': case 'glocke': case 'stromausfall': zeilen.push(`[Morgen ${e.nacht}] ${e.text}`); break
+      case 'licht': zeilen.push(`[Gespräch] ${e.text}`); break
+      case 'im-dunkeln': zeilen.push(`[${fremd(e.wer, ich) ? `Nur ${e.wer} weiß das] Die Stimme im Dunkeln eben war ${e.wer}.` : 'Nur du weißt das] Die Stimme im Dunkeln eben warst du.'}`); break
       case 'untersucht': zeilen.push(`${e.von === ich ? 'Du untersuchst' : `${e.von} untersucht`} ${e.ort === KLASSENBUCH ? 'das Klassenbuch' : `den Platz ${bei(e.ort)}`}.`); break
       case 'ergebnis': zeilen.push(`[${fremd(e.wer, ich) ? `Nur ${e.wer} weiß das` : 'Nur du weißt das'}] ${e.text}`); break
       case 'diskussion': zeilen.push(`[Gespräch, Runde ${e.runde}${e.von ? ` von ${e.von}` : ''}]`); break
@@ -183,8 +185,12 @@ export function claudeGehirn(figur, rolle, { anfrage, mitspieler, spieler = null
     const petzeAktiv = extra.petzeAktiv !== false
     const tools = werkzeuge(phase, rolle, andere, { verwischen: !!extra.verwischen, petzeAktiv })
     const nachricht = `Was du bisher mitbekommen hast:\n${verlaufAlsText(sicht, name)}\n\nNoch im Raum: ${lebende.join(', ')}.\n${AUFGABE[phase]}`
-    const verwerfe = (grund) => { log(`${name}: ${grund}, Rückfall`); return rueckfall(phase, andere, petzeAktiv) }
-    const eigeneLetzte = sicht.findLast((x) => x.art === 'sagt' && x.von === name)?.text ?? letzte
+    // Im Stromausfall verriete ein Name im Terminal-Log den Sprecher: dann ohne Namen loggen
+    const imDunkeln = phase === 'diskussion' && sicht.findLast((x) => x.art === 'stromausfall' || x.art === 'licht' || x.art === 'nacht')?.art === 'stromausfall'
+    const wer = imDunkeln ? 'eine Figur im Dunkeln' : name
+    const verwerfe = (grund) => { log(`${wer}: ${grund}, Rückfall`); return rueckfall(phase, andere, petzeAktiv) }
+    const meineDunklen = new Set(sicht.filter((x) => x.art === 'im-dunkeln' && x.wer === name).map((x) => x.sagt))   // eigene Saetze im Dunkeln
+    const eigeneLetzte = sicht.findLast((x) => x.art === 'sagt' && (x.von === name || meineDunklen.has(x.nr)))?.text ?? letzte
     // Hoechstens zwei Anfragen: die zweite nur, wenn der Waechter die erste Aeusserung verwirft.
     for (let versuch = 1; ; versuch++) {
       let erg
@@ -199,7 +205,7 @@ export function claudeGehirn(figur, rolle, { anfrage, mitspieler, spieler = null
           const pruefung = pruefeSprechen(roh, { eigeneLetzte })
           if (!pruefung.ok) {
             if (versuch >= 2) return verwerfe(pruefung.grund)
-            log(`${name}: ${pruefung.grund}, frage noch einmal`)
+            log(`${wer}: ${pruefung.grund}, frage noch einmal`)
             continue
           }
           const text = satzende(pruefung.text, 400)

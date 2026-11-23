@@ -263,3 +263,21 @@ test('Claude-Gehirn: woertliche Wiederholung der eigenen letzten Aeusserung wird
   const g2 = claudeGehirn(ladeFigur('Lea'), SCHUELER, { anfrage: f2.anfrage, mitspieler: NAMEN, zufall: zufall(1) })
   assert.deepEqual(await g2.diskussion(sicht, NAMEN), { art: 'schweigt' })
 })
+
+test('Claude-Gehirn im Stromausfall: eigener Satz im Dunkeln zaehlt fuer die Wiederholung, Log ohne Namen', async () => {
+  const sicht = [
+    { art: 'stromausfall', nacht: 1, text: 'Stromausfall.' },
+    { nr: 7, art: 'sagt', von: P.DUNKLE_STIMME, dunkel: true, an: null, text: 'Ich war am Fenster.' },
+    { nr: 8, art: 'im-dunkeln', wer: 'Lea', sagt: 7 },
+  ]
+  const log = []
+  const f = fakeAnfrage([sprich('Ich war am Fenster.'), sprich('Ich war am Fenster.')])
+  const g = claudeGehirn(ladeFigur('Lea'), SCHUELER, { anfrage: f.anfrage, mitspieler: NAMEN, zufall: zufall(1), log: (m) => log.push(m) })
+  assert.deepEqual(await g.diskussion(sicht, NAMEN), { art: 'schweigt' }, 'Wiederholung des dunklen Satzes wird erkannt')
+  assert.ok(log.length > 0 && log.every((m) => !m.includes('Lea')), `Log verraet den Sprecher: ${log.join(' | ')}`)
+  // Nach dem Licht wieder mit Namen
+  const log2 = []
+  const g2 = claudeGehirn(ladeFigur('Lea'), SCHUELER, { anfrage: fakeAnfrage([sprich('Ich war am Fenster.'), sprich('Ich war am Fenster.')]).anfrage, mitspieler: NAMEN, zufall: zufall(1), log: (m) => log2.push(m) })
+  await g2.diskussion([...sicht, { art: 'licht', text: 'Licht.' }], NAMEN)
+  assert.ok(log2.some((m) => m.startsWith('Lea:')))
+})

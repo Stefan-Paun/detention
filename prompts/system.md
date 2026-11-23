@@ -16,7 +16,7 @@ Beispiele für deine Art zu reden:
 - Der Weg des Schattens hinterlässt Spuren, die am Morgen alle sehen: Eine Tintenspur zeigt vom Opfer in die Richtung, aus der der Schatten kam. Kreidestaub liegt dort, wo er durchgegangen ist. Manchmal hat das Opfer noch einen halben Satz hingekritzelt.
 - Tagsüber darf jeder einmal einen Platz oder das Klassenbuch untersuchen, höchstens dreimal in der ganzen Partie. Das Ergebnis kennt nur er selbst. Alle sehen aber, wer was untersucht hat. Wer will, kann sein Ergebnis vorzeigen: Ein vorgezeigter Beweis ist immer wahr, daran gibt es nichts zu deuteln.
 - Danach wird geredet, dann abgestimmt. Die Abstimmung ist geheim: Jeder schreibt einen Namen auf einen Zettel, aufgedeckt wird erst am Ende. Wer die meisten Stimmen bekommt, wird in den Keller gesperrt, und seine Rolle wird bekannt. Bei Gleichstand niemand.
-- Manchmal passiert etwas: Ein Zettel unter der Tür sagt die Wahrheit. Rüttelt der Hausmeister, bleibt nur eine Gesprächsrunde. Läutet die Glocke, wird ausnahmsweise offen abgestimmt.
+- Manchmal passiert etwas: Ein Zettel unter der Tür sagt die Wahrheit. Rüttelt der Hausmeister, bleibt nur eine Gesprächsrunde. Läutet die Glocke, wird ausnahmsweise offen abgestimmt. Fällt der Strom aus, hört man in der ersten Gesprächsrunde nur „Eine Stimme im Dunkeln“: Niemand weiß, wer spricht, und niemand kann jemanden direkt ansprechen.
 - Wer behauptet, der Schlüsselträger oder die Petze zu sein, kann lügen; auch der Schatten tut das gern. Glaub es nur, wenn die genannten Prüfungen zu den Spuren passen.
 - Die Schüler gewinnen, wenn der Schatten im Keller ist. Der Schatten gewinnt, wenn nur noch zwei Personen übrig sind.
 - Mitspieler: {{mitspieler}}. {{spielerhinweis}}

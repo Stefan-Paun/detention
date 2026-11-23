@@ -131,7 +131,7 @@ export function funde({ plaetze, schatten, opfer, zufall, verwischt = false }) {
 }
 
 // Zufaelliges Tagesereignis (hoechstens eines): zettel = wahrer Hinweis, hausmeister = nur eine
-// Gespraechsrunde, glocke = geheime Abstimmung. null = ruhiger Tag.
+// Gespraechsrunde, glocke = offene Abstimmung, stromausfall = erste Gespraechsrunde ohne Namen. null = ruhiger Tag (15 %).
 export function tagesereignis({ plaetze, schatten, zufall }) {
   const w = zufall.zahl()
   if (w < 0.35) {
@@ -141,6 +141,7 @@ export function tagesereignis({ plaetze, schatten, zufall }) {
   }
   if (w < 0.55) return { art: 'hausmeister', text: 'Der Hausmeister rüttelt draußen an der Klinke und flucht. Heute bleibt nur eine Gesprächsrunde.' }
   if (w < 0.75) return { art: 'glocke', text: 'Die Schulglocke läutet, obwohl niemand sie berührt hat. Heute wird offen abgestimmt: Jeder sieht sofort, wer wie stimmt.' }
+  if (w < 0.85) return { art: 'stromausfall', text: 'Stromausfall. Die Lampe bleibt dunkel. In der ersten Gesprächsrunde sieht niemand, wer spricht, und niemand kann jemanden direkt ansprechen.' }
   return null
 }
 

@@ -8,18 +8,18 @@ Werwolf-artiges Spiel: Stefan + sechs Claude-Figuren (Mira, Jonas, Lea, Tarik, N
 - `npm run simuliere`: Partien mit Skript-Gehirnen, kostet nichts.
 - `npm run labor`: Regelvarianten in je 2000 Skript-Partien vergleichen (Tabelle + `ausgabe/labor.html`, kostet nichts). Befund in `docs/balance-labor.md`.
 - `npm run spiele` / `-- --zuschauen`: echte Haiku-Aufrufe, Cent-Beträge. Nur nach Stefans OK starten.
-- `node tools/zug.mjs <port> …`: mitspielen von der Kommandozeile (auch für Test-Agenten). `GET /verlauf?ab=n` liefert sichtbare Ereignisse als JSON.
+- `node tools/zug.mjs <port> …`: mitspielen von der Kommandozeile (auch für Test-Agenten). `GET /verlauf?ab=n` liefert sichtbare Ereignisse als JSON, `GET /protokoll` (erst nach dem Ende, sonst 409) die Partie als Markdown aus `spiel/protokoll.mjs` (nur Öffentliches und am Ende Aufgedecktes, nie Hefte).
 - Tester-Runde 31.10.: 10 Agenten mit Personas spielten je eine Partie (eigene Server 4810–4819 mit `XDG_DATA_HOME` je Agent). Feedback floss in v1.1 ein (geheime Abstimmung, Nacht-1-Schutz, Vorzeigen).
 
 ## Aufbau
 
 - `spiel/partie.mjs`: Regeln. Jedes Ereignis hat `sichtbar` (wer es sehen darf); `verlaufFuer(name)` ist der Kontext einer Figur. Rollen, Platz, Nachtwahl, Prüfung, Beobachtungen und Untersuchungsergebnisse bleiben privat.
-- `spiel/regeln.mjs`: Stellschrauben als ein Objekt (`STANDARD_REGELN` = heutiges Spiel). Server und Claude-Gehirn nutzen nur den Standard; Abweichungen (`neuePartie(..., { regeln })`) sind für `tools/labor.mjs`. Stichwahl und Schlussnacht sind in Browser und Claude-Prompt nicht eigens erklärt.
+- `spiel/regeln.mjs`: Stellschrauben als ein Objekt (`STANDARD_REGELN` = heutiges Spiel). Server und Claude-Gehirn nutzen nur den Standard; Abweichungen (`neuePartie(..., { regeln })`) sind für `tools/labor.mjs`. Stichwahl und Schlussnacht sind in Browser und Claude-Prompt nicht eigens erklärt. Stromausfall (Tagesereignis): in Runde 1 trägt `sagt` den Absender `DUNKLE_STIMME`, den echten Sprecher kennt nur das private `im-dunkeln`; Server und Demo senden dann kein `tippt`.
 - `spiel/welt.mjs`: die Wahrheit hinter dem Gerede: Orte, Weg des Schattens, Beobachtungen, Funde, Tagesereignisse, Untersuchungen. Alles, was daraus kommt, muss wahr sein (Tests prüfen das).
 - `spiel/gehirn.mjs`: Claude-Gehirn (Systemprompt aus `prompts/` + `figuren/`, Werkzeuge je Phase, Rückfall bei Unsinn). Gleiche Schnittstelle wie `tools/skriptgehirne.mjs`.
 - `spiel/claude.mjs`: Messages-API per fetch. Haiku 5.5: kein Prefill, keine temperature, `thinking: disabled` + `effort: low`, Refusal ist HTTP 200. Nullable Enums als `anyOf`, nicht `type: [..., 'null']`; bei `strict: true` kein `minimum`/`maximum`, stattdessen `enum`.
 - `spiel/kosten.mjs`: Tageszähler mit Deckel. `spiel/schleife.mjs`: eine Schleife für alle Gehirne.
-- `spiel/spurentafel.mjs`: Spurentafel als Text (Terminal, `zug.mjs --tafel`); gleiche Logik wie `merke`/`zeigeTafel` in `public/app.js`. Private Nacht-Ereignisse (`platz`, `schatten-waehlt`, `pruefung`, `ergebnis`) tragen `wer`; Zuschauer und Geister sehen sie mit Namen, Figuren nur die eigenen.
+- `spiel/spurentafel.mjs`: Spurentafel als Text (Terminal, `zug.mjs --tafel`); gleiche Logik wie `merke`/`zeigeTafel` in `public/app.js`. Private Ereignisse (`platz`, `schatten-waehlt`, `pruefung`, `ergebnis`, `im-dunkeln`) tragen `wer`; Zuschauer und Geister sehen sie mit Namen, Figuren nur die eigenen.
 - Browser-Demo: `public/lokal.js` spielt ohne Server mit `spiel/skriptgehirne.mjs` (auf Pages oder `?demo=1`). Alles, was `public/*.js` importiert, muss ohne `node:` auskommen; `tools/seite.mjs` baut `_site/` und bricht sonst ab. `tools/skriptgehirne.mjs` ist nur noch ein Re-Export.
 - `spiel/hefte.mjs`: Erinnerung über Partien (JSON je Figur unter `~/.local/share/nachsitzen/hefte/`). Die Hefte enthalten Urteile über Stefan; nie in Logs, Commits oder Screenshots.
 

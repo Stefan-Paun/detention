@@ -294,3 +294,88 @@ test('Server: eine abgelehnte neue Partie (doppelter Name) laesst die laufende P
     assert.ok(ev.length > 0)
   } finally { await s.schliessen() }
 })
+
+test('Server: Stromausfall verraet den Sprecher weder per tippt noch per Ereignis', async () => {
+  // Startwert 1: Stromausfall in einer Spieler-Partie, waehrend Stefan noch im Raum ist (prueft die erste Zusicherung)
+  for (const startwert of [1]) {
+    const s = erstelleServer({ gehirnFabrik: fabrik, port: 0, pause: 0, startwert })
+    const port = await s.starten()
+    try {
+      await post(port, '/partie', { name: 'Stefan' })
+      const ev = await sse(port, (l) => l.some((e) => e.art === 'status' && e.daten?.phase === 'ende'), {
+        auf: async (e) => {
+          const w = e.art === 'warte' ? e.daten : e.art === 'status' ? e.daten?.warte : null
+          if (!w) return
+          if (w.art === 'sagen') await post(port, '/aktion', { art: 'sagt', text: 'Ich war am Fenster.', an: w.andere[0] })
+          else if (w.art === 'stimme') await post(port, '/aktion', { fuer: null })
+          else if (w.art === 'nacht') await post(port, '/aktion', { platz: w.orte[0], ziel: w.optionen[0] })
+          else if (w.art === 'untersuchen') await post(port, '/aktion', { ort: null })
+          else if (w.art === 'zeigen') await post(port, '/aktion', { zeigen: false })
+        }, zeit: 15000,
+      })
+      const p = s.partie()
+      const strom = p.ereignisse.find((e) => e.art === 'stromausfall')
+      assert.ok(strom, 'Startwert liefert keinen Stromausfall')   // dass Stefan im Raum war, zeigt sein eigenes im-dunkeln unten
+      const i = ev.findIndex((e) => e.art === 'ereignis' && e.daten.art === 'stromausfall')
+      const j = ev.findIndex((e, k) => k > i && e.art === 'ereignis' && e.daten.art === 'licht')
+      assert.ok(i >= 0 && j > i)
+      const fenster = ev.slice(i, j)
+      assert.ok(!fenster.some((e) => e.art === 'tippt'), 'im Dunkeln kein "X überlegt"')
+      const dunkel = fenster.filter((e) => e.art === 'ereignis' && e.daten.art === 'sagt')
+      assert.ok(dunkel.length > 0)
+      assert.ok(dunkel.every((e) => e.daten.von === 'Eine Stimme im Dunkeln' && e.daten.an === null))
+      assert.ok(fenster.filter((e) => e.art === 'ereignis' && e.daten.art === 'im-dunkeln').every((e) => e.daten.wer === 'Stefan'), 'fremde Sprecher bleiben geheim')
+      assert.ok(fenster.some((e) => e.art === 'ereignis' && e.daten.art === 'im-dunkeln' && e.daten.wer === 'Stefan'), 'Stefan erfaehrt, dass er es war')
+    } finally { await s.schliessen() }
+  }
+})
+
+test('Server: /protokoll erst nach dem Ende, ohne Hefte und ohne Schluessel', async () => {
+  const ordner = fs.mkdtempSync(path.join(os.tmpdir(), 'ns-srv-protokoll-'))
+  const hefte = hefteSpeicher({ ordner })
+  const MARKER = ['GEHEIM', 'HEFT'].join('-')
+  hefte.schreiben('Mira', { eintrag: `${MARKER}: Stefan wirkt nervös.`, vertrauen: { Stefan: -2 } })
+  const fabrikMitHeft = (name, rolle, opts) => {
+    const g = skriptGehirn(name, rolle, opts.zufall)
+    g.heftSchreiben = async () => ({ eintrag: `${MARKER} neu`, vertrauen: {} })
+    return g
+  }
+  const schluessel = ['sk', 'ant', 'test', 'nie', 'im', 'protokoll'].join('-')   // nur zur Laufzeit zusammengesetzt
+  const alt = process.env.ANTHROPIC_API_KEY
+  process.env.ANTHROPIC_API_KEY = schluessel
+  const s = erstelleServer({ gehirnFabrik: fabrikMitHeft, hefte, port: 0, pause: 0, startwert: 9 })
+  const port = await s.starten()
+  try {
+    assert.equal((await fetch(`http://127.0.0.1:${port}/protokoll`)).status, 409, 'ohne Partie')
+    await post(port, '/partie', { name: 'Stefan' })
+    const vorher = await fetch(`http://127.0.0.1:${port}/protokoll`)
+    assert.equal(vorher.status, 409, 'waehrend der Partie (sie wartet auf Stefans ersten Satz)')
+    assert.match((await vorher.json()).fehler, /erst nach der Partie/)
+    await sse(port, (l) => l.some((e) => e.art === 'hefte'), {
+      auf: async (e) => {
+        const w = e.art === 'warte' ? e.daten : e.art === 'status' ? e.daten?.warte : null
+        if (!w) return
+        if (w.art === 'sagen') await post(port, '/aktion', { art: 'sagt', text: 'Ich war an der Tafel.' })
+        else if (w.art === 'stimme') await post(port, '/aktion', { fuer: w.optionen[0] })
+        else if (w.art === 'nacht') await post(port, '/aktion', { platz: w.orte[1], ziel: w.optionen[0] })
+        else if (w.art === 'untersuchen') await post(port, '/aktion', { ort: w.orte[0] })
+        else if (w.art === 'zeigen') await post(port, '/aktion', { zeigen: false })
+      }, zeit: 15000,
+    })
+    assert.equal(s.partie().phase, 'ende')
+    const r = await fetch(`http://127.0.0.1:${port}/protokoll`)
+    assert.equal(r.status, 200)
+    assert.match(r.headers.get('content-type'), /^text\/markdown/)
+    assert.match(r.headers.get('content-disposition'), /attachment; filename="nachsitzen-protokoll\.md"/)
+    const t = await r.text()
+    assert.match(t, /Startwert: 9/)
+    assert.match(t, /## Nacht 1/)
+    assert.match(t, /Die Schüler haben gewonnen|Der Schatten hat gewonnen/)
+    assert.match(t, /\*\*Stefan\*\*: Ich war an der Tafel\./)
+    assert.ok(!t.includes(MARKER), 'nie ein Hefteintrag')
+    assert.ok(!t.includes(schluessel) && !/sk-ant/.test(t), 'nie der Schluessel')
+  } finally {
+    await s.schliessen()
+    if (alt === undefined) delete process.env.ANTHROPIC_API_KEY; else process.env.ANTHROPIC_API_KEY = alt
+  }
+})

@@ -1,7 +1,7 @@
 // Nachsitzen im Browser: Verlauf aus Sicht des Spielers, Spurentafel (Raumplan, Wissen, Funde),
 // Pixel-Avatare und Eingaben an den Server. Alles Deutsch, keine Abhaengigkeiten.
 
-import { layout, zeichneFigur, klasseAnimator, waehleSchreck } from './klasse.js'
+import { layout, zeichneFigur, klasseAnimator, waehleSchreck, beschreibeSzene } from './klasse.js'
 import { tonAnlage } from './ton.js'
 import { starteEditor, besetzung } from './editor.js'
 import { farbeFuer } from './besetzung.js'
@@ -36,6 +36,7 @@ const szene = klasseAnimator($('szene'))
 let sprecher = null, pulte = null
 const ton = tonAnlage()
 let schreckeBenutzt = []
+let dunkel = false   // Stromausfall in der ersten Gespraechsrunde: Lampe aus
 
 // --- Einstellungen: Ton, Schrecken, Daemmerung (nur fuer diesen Browser gemerkt) ------------
 const einstellungen = { ton: false, schrecken: true, daemmerung: false }
@@ -100,6 +101,14 @@ function blase(von, text, { an = null, still = false } = {}) {
   b.appendChild(document.createTextNode(text))
   z.appendChild(b); verlauf.appendChild(z); unten()
 }
+// Stromausfall: ein Satz ohne Namen und ohne Gesicht
+function dunkleBlase(text) {
+  const z = document.createElement('div'); z.className = 'zeile dunkel'
+  const b = document.createElement('div'); b.className = 'blase'
+  const w = document.createElement('div'); w.className = 'wer'; w.textContent = 'Eine Stimme im Dunkeln'
+  b.appendChild(w); b.appendChild(document.createTextNode(text))
+  z.appendChild(b); verlauf.appendChild(z); unten()
+}
 function farbe(name) {
   if (name === status?.spieler) return 'var(--ich)'
   const v = getComputedStyle(document.documentElement).getPropertyValue(`--${name.toLowerCase()}`)
@@ -118,12 +127,13 @@ function zeigeEreignis(e) {
   switch (e.art) {
     case 'start': regie(e.text); break
     case 'rolle': if (e.name === ich) $('meinerolle').textContent = `Deine Rolle: ${ROLLE[e.rolle]}. ${ROLLE_ERKLAERT[e.rolle] || ''}`; break
-    case 'nacht': karten = { privat: null, morgen: null }; regie(`Nacht ${e.nacht}. ${e.text}`, 'dunkel'); ton.klang('nacht'); vielleichtErschrecken(); break
+    case 'nacht': dunkel = false; karten = { privat: null, morgen: null }; regie(`Nacht ${e.nacht}. ${e.text}`, 'dunkel'); ton.klang('nacht'); vielleichtErschrecken(); break
     case 'platz': regie(`${e.wer === ich ? 'Du stellst dich' : `${e.wer} stellt sich`} ${BEI[e.ort] || e.ort} hin.`, 'geheim'); break
     case 'schatten-waehlt': regie(e.wer && e.wer !== ich ? `${e.wer} ist der Schatten und schleicht zu ${e.ziel}.${e.verwischt ? ' Die Tinte wird mit dem Ärmel verwischt.' : ''}` : `Du schleichst zu ${e.ziel} und zurück.${e.verwischt ? ' Du verwischst die Tinte mit dem Ärmel.' : ''}`, 'geheim'); break
     case 'wahrheit': {
       const k = karte('morgen', 'Die Wahrheit')
       kartenZeile(k, Object.entries(e.rollen).map(([n, r]) => `${n === ich ? 'Du' : n}: ${ROLLE[r]}`).join(' · '), 'schwer')
+      for (const d of e.imDunkeln || []) kartenZeile(k, `Im Dunkeln (Tag ${d.nacht}) sprach ${d.von === ich ? 'du' : d.von}: „${d.text}“`)
       for (const n of e.naechte) kartenZeile(k, `Nacht ${n.nacht}: ${Object.entries(n.plaetze).map(([k2, o]) => `${k2 === ich ? 'du' : k2} ${BEI[o] || o}`).join(', ')}. ${n.schatten} holt ${n.opfer}${n.verwischt ? ' und verwischt die Spur' : ''}.`)
       break
     }
@@ -139,13 +149,17 @@ function zeigeEreignis(e) {
       if (e.name === ich) regie('Du bist verschwunden. Als Geist siehst du ab jetzt alles: jeden Platz, jede Beobachtung, jeden Zettel. Die Spurentafel füllt sich von selbst.', 'ende'); break
     case 'fund': kartenZeile(karten.morgen || (karten.morgen = karte('morgen', `Morgen ${e.nacht}`)), e.text, e.typ === 'notiz' ? 'fund notiz' : 'fund'); break
     case 'zettel': kartenZeile(karten.morgen || (karten.morgen = karte('morgen', `Morgen ${e.nacht}`)), `Ein Zettel unter der Tür: „${e.text}“`, 'fund'); break
-    case 'hausmeister': case 'glocke': kartenZeile(karten.morgen || (karten.morgen = karte('morgen', `Morgen ${e.nacht}`)), e.text, 'ereignis'); break
+    case 'hausmeister': case 'glocke': case 'stromausfall': kartenZeile(karten.morgen || (karten.morgen = karte('morgen', `Morgen ${e.nacht}`)), e.text, 'ereignis'); if (e.art === 'stromausfall') dunkel = true; break
     case 'untersucht': blase(e.von, `${e.von === ich ? 'Du untersuchst' : 'untersucht'} ${e.ort === status?.klassenbuch ? 'das Klassenbuch' : `den Platz ${BEI[e.ort] || e.ort}`}.`, { still: true }); break
     case 'beweis': regie(`Beweis, vorgezeigt von ${e.von === ich ? 'dir' : e.von} (vom Spiel geprüft): ${e.text}`, 'beweis'); break
     case 'zettelwahl': regie(`Zettel aufgedeckt: ${Object.entries(e.stimmen).map(([v, f]) => `${v === ich ? 'du' : v} → ${f ?? 'niemand'}`).join(' · ')}`, 'schwer'); break
     case 'ergebnis': regie(`${e.wer && e.wer !== ich ? `Nur ${e.wer} weiß das` : 'Nur du weißt das'}: ${e.text}`, 'geheim'); break
     case 'diskussion': regie(`Gespräch, Runde ${e.runde}${e.von ? ` von ${e.von}` : ''}`); if (e.runde === 1) ton.klang('morgen'); break
-    case 'sagt': sprecher = e.von; blase(e.von, e.text, { an: e.an }); if (e.von !== ich) ton.klang('stimme'); break
+    case 'sagt':
+      if (e.dunkel) { sprecher = null; dunkleBlase(e.text); ton.klang('stimme'); break }
+      sprecher = e.von; blase(e.von, e.text, { an: e.an }); if (e.von !== ich) ton.klang('stimme'); break
+    case 'im-dunkeln': regie(e.wer && e.wer !== ich ? `Die Stimme im Dunkeln eben war ${e.wer}.` : 'Die Stimme im Dunkeln eben warst du. Niemand sonst weiß das.', 'geheim'); break
+    case 'licht': regie(e.text); dunkel = false; zeigeSzene(); break
     case 'schweigt': blase(e.von, `${e.von === ich ? 'Du schweigst' : `${e.von} schweigt`}.`, { still: true }); break
     case 'abstimmung': regie(e.text, 'schwer'); break
     case 'stimme': blase(e.von, e.von === ich ? `Dein Zettel: ${e.fuer ?? 'niemand'}.` : (e.fuer ? `stimmt für ${e.fuer === ich ? 'dich' : e.fuer}.` : 'stimmt nicht ab.'), { still: true }); break
@@ -185,7 +199,7 @@ function merke(e) {
       if (e.typ === 'staub') wissen.staub.add(e.ort)
       break
     case 'zettel': wissen.zettel = e.ort; wissen.funde.push(`Zettel: ${e.text}`); break
-    case 'hausmeister': case 'glocke': wissen.funde.push(e.text); break
+    case 'hausmeister': case 'glocke': case 'stromausfall': wissen.funde.push(e.text); break
     case 'sagt': if (e.behauptet && e.nacht === wissen.nacht) wissen.behauptet[e.von] = e.behauptet; break
     case 'ergebnis':
       if (e.ort === status?.klassenbuch) { if (e.name && e.platz) wissen.plaetze[e.name] = e.platz }
@@ -200,7 +214,9 @@ function zeigeSzene() {
   const namen = Object.keys(status.figuren || {})
   if (!pulte) { pulte = {}; namen.forEach((n, i) => { pulte[n] = i }) }
   const l = layout({ phase: status.phase, namen, lebende: status.lebende, verschwunden: status.verschwunden, keller: status.keller, spieler: status.spieler, zuschauen: status.zuschauen, plaetze: wissen.plaetze, opfer: wissen.opfer, pulte })
-  szene.setze({ layout: l, looks: status.figuren, spieler: status.spieler, spur: wissen.spur, staub: new Set([...wissen.staub, ...wissen.durchgang]), zettel: !!wissen.zettel, sprecher, ende: status.phase === 'ende', phase: status.phase, daemmerung: einstellungen.daemmerung })
+  $('szene').setAttribute('aria-label', beschreibeSzene({ phase: status.phase, nacht: status.nacht, lebende: status.lebende, verschwunden: status.verschwunden, keller: status.keller, spieler: status.spieler, plaetze: wissen.plaetze }))
+  szene.setze({ layout: l, looks: status.figuren, spieler: status.spieler, spur: wissen.spur, staub: new Set([...wissen.staub, ...wissen.durchgang]), zettel: !!wissen.zettel, sprecher, ende: status.phase === 'ende', phase: status.phase, daemmerung: einstellungen.daemmerung, stromausfall: dunkel })
+  $('lampe').classList.toggle('aus', status.phase === 'nacht' || dunkel)
 }
 
 function zeigeTafel() {
@@ -267,6 +283,22 @@ async function hefteLesen() {
   if (!k.querySelector('p')) kartenZeile(k, 'Noch leer. Nach der ersten Partie mit echten Figuren steht hier etwas.')
 }
 $('heftknopf').onclick = hefteLesen
+// --- Protokoll: die ganze Partie als Markdown-Datei (ohne Hefte, ohne Schluessel) ------------
+async function protokollSpeichern() {
+  let text
+  if (DEMO) text = leiter?.protokoll()
+  else {
+    const r = await fetch('/protokoll')
+    if (!r.ok) { $('fehler').textContent = (await r.json().catch(() => ({}))).fehler || 'Kein Protokoll'; return }
+    text = await r.text()
+  }
+  if (!text) { $('fehler').textContent = 'Das Protokoll gibt es erst nach der Partie'; return }
+  const url = URL.createObjectURL(new Blob([text], { type: 'text/markdown;charset=utf-8' }))
+  const a = document.createElement('a'); a.href = url; a.download = 'nachsitzen-protokoll.md'
+  document.body.appendChild(a); a.click(); a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+$('protokollknopf').onclick = protokollSpeichern
 function marke(d, klasse, text) { const m = document.createElement('div'); m.className = `marke ${klasse}`; m.textContent = text; d.appendChild(m) }
 function fuelle(ul, eintraege, leer) {
   ul.innerHTML = ''
@@ -300,21 +332,24 @@ function zeigeKlasse() {
     t.appendChild(name); t.appendChild(s); li.appendChild(t); ul.appendChild(li)
   }
   $('phase').textContent = status.phase === 'ende' ? 'Die Tür geht auf.' : `${PHASE[status.phase] || ''}${status.nacht ? ` · Nacht ${status.nacht}` : ''}`
-  $('lampe').classList.toggle('aus', status.phase === 'nacht')
+  $('lampe').classList.toggle('aus', status.phase === 'nacht' || dunkel)
   $('neu').hidden = false
   $('heftknopf').hidden = !(status.hefte && status.phase === 'ende')
+  $('protokollknopf').hidden = status.phase !== 'ende'
   if (status.rolle && !$('meinerolle').textContent) $('meinerolle').textContent = `Deine Rolle: ${ROLLE[status.rolle]}. ${ROLLE_ERKLAERT[status.rolle] || ''}`
 }
 
 // --- Eingabe -------------------------------------------------------------------------
+let letzteFrage = null
 function zeigeWarte(w) {
   const sagen = $('sagen'), wahl = $('wahl'), hinweis = $('hinweis')
   sagen.hidden = true; wahl.hidden = true; wahl.innerHTML = ''
-  if (!w) { hinweis.textContent = status?.spieler && status.phase !== 'ende' ? 'Die anderen reden …' : ''; return }
+  if (!w) { letzteFrage = null; hinweis.textContent = status?.spieler && status.phase !== 'ende' ? 'Die anderen reden …' : ''; return }
   if (w.art === 'sagen') {
-    hinweis.textContent = w.pflicht ? 'Sag einen Satz zum Anfang.' : 'Du bist dran. Sag etwas oder schweig.'
+    hinweis.textContent = w.pflicht ? 'Sag einen Satz zum Anfang.' : (w.dunkel || dunkel) ? 'Du bist dran. Stromausfall: Niemand sieht, wer spricht. Sag etwas oder schweig.' : 'Du bist dran. Sag etwas oder schweig.'
     const an = $('an'); an.innerHTML = '<option value="">an alle</option>'
     for (const n of w.andere) { const o = document.createElement('option'); o.value = n; o.textContent = `zu ${n}`; an.appendChild(o) }
+    an.hidden = !!(w.dunkel || dunkel)   // im Dunkeln kann man niemanden direkt ansprechen
     $('schweigen').hidden = w.pflicht
     sagen.hidden = false; $('text').focus()
     return
@@ -329,6 +364,7 @@ function zeigeWarte(w) {
       let verwischen = false
       if (w.verwischen) { const b = knopf(wahl, 'Spur verwischen: aus', () => { verwischen = !verwischen; b.textContent = `Spur verwischen: ${verwischen ? 'an' : 'aus'}`; b.classList.toggle('leise', !verwischen) }, 'leise'); b.title = 'Einmal pro Partie. Keine Richtung, kein Kreidestaub, aber Nachbarn merken, dass du lange weg warst.' }
       for (const n of w.optionen) knopf(wahl, n, () => sende({ platz: o, ziel: n, verwischen }))
+      wahl.querySelector('button:not(.leise)')?.focus()
     })
   } else if (w.art === 'zeigen') {
     hinweis.textContent = `Willst du dein Ergebnis allen vorzeigen? „${w.ergebnis}“ Vorgezeigt gilt es als bewiesen.`
@@ -343,6 +379,10 @@ function zeigeWarte(w) {
     for (const n of w.optionen) knopf(wahl, n, () => sende({ fuer: n }))
     knopf(wahl, 'niemand', () => sende({ fuer: null }), 'leise')
   }
+  // Fokus nur bei einer neuen Frage, nicht bei jedem Status-Update (sonst springt er zurueck)
+  const schluessel = JSON.stringify(w)
+  if (schluessel !== letzteFrage) wahl.querySelector('button:not(.leise)')?.focus()
+  letzteFrage = schluessel
 }
 function knopf(wo, text, tu, extra = '') { const b = document.createElement('button'); b.className = `knopf ${extra}`; b.type = 'button'; b.textContent = text; b.onclick = tu; wo.appendChild(b); return b }
 function ortKnopf(wo, ort, tu) {
@@ -363,7 +403,7 @@ $('sagen').onsubmit = (ev) => { ev.preventDefault(); const text = $('text').valu
 $('schweigen').onclick = () => sende({ art: 'schweigt' })
 
 // --- Start und Verbindung --------------------------------------------------------------
-function frisch() { hoechsteNr = -1; verlauf.innerHTML = ''; tippende = new Map(); karten = { privat: null, morgen: null }; wissen = leeresWissen(0); pulte = null; sprecher = null; schreckeBenutzt = []; $('meinerolle').textContent = '' }
+function frisch() { hoechsteNr = -1; verlauf.innerHTML = ''; tippende = new Map(); karten = { privat: null, morgen: null }; wissen = leeresWissen(0); pulte = null; sprecher = null; schreckeBenutzt = []; dunkel = false; $('meinerolle').textContent = '' }
 async function starten(zuschauen) {
   const name = $('name').value.trim()
   if (!zuschauen && !name) { $('name').focus(); return }
@@ -384,7 +424,7 @@ async function starten(zuschauen) {
 if (!DEMO) starteEditor({ onAenderung: (ok) => { for (const b of document.querySelectorAll('#startform button[type="submit"], #zuschauen')) b.disabled = !ok } }).catch(() => {})
 $('startform').onsubmit = (ev) => { ev.preventDefault(); starten(false) }
 $('zuschauen').onclick = () => starten(true)
-$('neu').onclick = () => { $('raum').hidden = true; $('eingabe').hidden = true; $('start').hidden = false; $('neu').hidden = true; quelle?.close(); quelle = null; leiter?.beenden() }
+$('neu').onclick = () => { $('protokollknopf').hidden = true; $('heftknopf').hidden = true; $('raum').hidden = true; $('eingabe').hidden = true; $('start').hidden = false; $('neu').hidden = true; quelle?.close(); quelle = null; leiter?.beenden() }
 
 // Was mit jeder Nachricht passiert, egal ob sie vom Server-Stream oder vom lokalen Spielleiter kommt
 const EMPFANG = {

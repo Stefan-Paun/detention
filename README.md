@@ -67,7 +67,7 @@ Die Figuren laufen auf Claude Haiku 5.5. Eine Partie braucht 40 bis 80 Aufrufe u
 | Figuren schweigen, Rückfall-Meldungen im Terminal | Tagesdeckel erreicht oder Netz weg; `npm start` zeigt es |
 | Port belegt | `NACHSITZEN_PORT=4801 npm start` |
 
-Mitspielen geht auch ohne Browser: `node tools/zug.mjs 4800 --neu DeinName`, dann `node tools/zug.mjs 4800` und die Befehle, die es vorschlägt; `--tafel` zeigt die Spurentafel als Text. `npm run spiele` spielt ganz im Terminal und blendet die Tafel vor jedem Gespräch ein.
+Mitspielen geht auch ohne Browser: `node tools/zug.mjs 4800 --neu DeinName`, dann `node tools/zug.mjs 4800` und die Befehle, die es vorschlägt; `--tafel` zeigt die Spurentafel als Text, `--protokoll` nach dem Ende die ganze Partie als Markdown. Im Browser heißt das „Protokoll speichern“: Es enthält nur, was alle gesehen haben oder am Ende aufgedeckt wird (Rollen, Plätze, Opfer), nie Hefte und nie den Schlüssel. `npm run spiele` spielt ganz im Terminal und blendet die Tafel vor jedem Gespräch ein.
 
 ## Was passiert
 
@@ -84,7 +84,7 @@ Jeder Platz hat nachts einen Vorteil: Bei der **Tür** hörst du jeden Schritt i
 
 **Die Petze** (ab 7 Figuren genau eine) erfährt in Nacht 1, 3, 5 … die Rolle einer Person ihrer Wahl: Schatten, Schlüsselträger, Petze oder Schüler. Niemand sonst sieht, wen sie gewählt hat oder was herauskam; ob sie es weitersagt und ob man ihr glaubt, ist Teil des Spiels (auch der Schatten darf sich als Petze ausgeben). Warum erst ab 7 und nur jede zweite Nacht: [docs/balance-petze.md](docs/balance-petze.md).
 
-Regeln, die man wissen sollte: In der ersten Nacht holt der Schatten nie den menschlichen Spieler. Der Schatten darf einmal pro Partie seine Spur verwischen. Scheidest du aus, schaust du als Geist weiter zu und siehst dann alles, auch die Nacht der anderen. Manchmal passiert etwas: ein Zettel unter der Tür (sagt die Wahrheit), der Hausmeister rüttelt (nur eine Gesprächsrunde), die Glocke läutet (offene Abstimmung).
+Regeln, die man wissen sollte: In der ersten Nacht holt der Schatten nie den menschlichen Spieler. Der Schatten darf einmal pro Partie seine Spur verwischen. Scheidest du aus, schaust du als Geist weiter zu und siehst dann alles, auch die Nacht der anderen. Manchmal passiert etwas: ein Zettel unter der Tür (sagt die Wahrheit), der Hausmeister rüttelt (nur eine Gesprächsrunde), die Glocke läutet (offene Abstimmung), der Strom fällt aus (in der ersten Gesprächsrunde sieht niemand, wer spricht).
 
 Begriffe: Die Schule hat sieben **Pulte** (eines je Figur) und vier **Plätze** für die Nacht (Tür, Tafel, Pulte, Fenster). Wer verschwindet, wurde vom Schatten geholt; wer im **Keller** sitzt, wurde eingesperrt.
 
@@ -117,7 +117,7 @@ npm run spiele -- --zuschauen     # eine echte Partie im Terminal (kostet Cent)
 node tools/seite.mjs _site        # statische Browser-Demo bauen (wie der Pages-Workflow)
 ```
 
-Aufbau: `spiel/partie.mjs` (Regeln; jedes Ereignis weiß, wer es sehen darf), `spiel/regeln.mjs` (die Stellschrauben als ein Objekt, Standard = heutiges Spiel), `spiel/welt.mjs` (die Wahrheit hinter dem Gerede: Plätze, Spuren, Beobachtungen), `spiel/gehirn.mjs` (Claude-Figur mit eigenem Kontext und Werkzeug-Aufrufen), `spiel/hefte.mjs` (Erinnerung), `spiel/figurenschema.mjs` / `spiel/figurenspeicher.mjs` / `spiel/figurentext.mjs` (eigene Figuren: Prüfung, Ablage, Prompt-Bereinigung), `spiel/spurentafel.mjs` (die Spurentafel als Text für Terminal und `zug.mjs --tafel`), `spiel/skriptgehirne.mjs` (Skript-Figuren für Tests, Simulation und Demo), `server.mjs` (lokaler Server, SSE), `public/` (Browser, Pixelszene), `public/lokal.js` (Spielleiter im Browser für die Demo). Was im Browser läuft, darf nichts aus `node:` importieren; `tools/seite.mjs` prüft das beim Bauen. Der Plan mit allen Entscheidungen: [docs/PLAN.md](docs/PLAN.md).
+Aufbau: `spiel/partie.mjs` (Regeln; jedes Ereignis weiß, wer es sehen darf), `spiel/regeln.mjs` (die Stellschrauben als ein Objekt, Standard = heutiges Spiel), `spiel/welt.mjs` (die Wahrheit hinter dem Gerede: Plätze, Spuren, Beobachtungen), `spiel/gehirn.mjs` (Claude-Figur mit eigenem Kontext und Werkzeug-Aufrufen), `spiel/hefte.mjs` (Erinnerung), `spiel/figurenschema.mjs` / `spiel/figurenspeicher.mjs` / `spiel/figurentext.mjs` (eigene Figuren: Prüfung, Ablage, Prompt-Bereinigung), `spiel/spurentafel.mjs` (die Spurentafel als Text für Terminal und `zug.mjs --tafel`), `spiel/protokoll.mjs` (Partie-Protokoll als Markdown, `GET /protokoll` nach dem Ende), `spiel/skriptgehirne.mjs` (Skript-Figuren für Tests, Simulation und Demo), `server.mjs` (lokaler Server, SSE), `public/` (Browser, Pixelszene), `public/lokal.js` (Spielleiter im Browser für die Demo). Was im Browser läuft, darf nichts aus `node:` importieren; `tools/seite.mjs` prüft das beim Bauen. Der Plan mit allen Entscheidungen: [docs/PLAN.md](docs/PLAN.md).
 
 ### Balance-Labor
 

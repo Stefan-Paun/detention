@@ -18,6 +18,7 @@
     <button class="schalter" id="r-daemmerung" aria-pressed="false" title="Alles ruhiger: heller, ohne Schrecken, ohne Bewegung">Dämmerung</button>
   </div>
   <button class="knopf leise" id="heftknopf" hidden>Hefte lesen</button>
+  <button class="knopf leise" id="protokollknopf" hidden>Protokoll speichern</button>
   <button class="knopf leise" id="neu" hidden>Neue Partie</button>
 </header>
 
@@ -95,7 +96,7 @@
       <canvas class="szene" id="szene" width="320" height="120" role="img" aria-label="Das Klassenzimmer"></canvas>
       <div class="verlauf" id="verlauf" aria-live="polite"></div>
     </div>
-    <aside class="tafel">
+    <aside class="tafel" aria-label="Spurentafel">
       <h2>Spurentafel <span class="nachtnr" id="nachtnr"></span></h2>
       <div class="raumplan" id="raumplan"></div>
       <h3>Was ich weiß</h3>
@@ -112,7 +113,7 @@
 </main>
 
 <footer class="eingabe" id="eingabe" hidden>
-  <div class="hinweis" id="hinweis"></div>
+  <div class="hinweis" id="hinweis" role="status" aria-live="polite"></div>
   <div class="fehler" id="fehler" role="alert"></div>
   <form class="sagen" id="sagen" hidden>
     <select id="an" aria-label="An wen"><option value="">an alle</option></select>

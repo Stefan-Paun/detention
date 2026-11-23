@@ -73,7 +73,7 @@ export function zeichneFigur(g, x, y, look, px = 1, { dunkel = false } = {}) {
   if (frisur === 'kurz') r(3, 1, 6, 1, haar)
 }
 
-// szene: { layout, looks, spieler, lampe (0..1), positionen: {name: {x,y}}, spur, staub:Set, durchgang:Set, zettel, sprecher, ende, phase }
+// szene: { layout, looks, spieler, lampe (0..1), positionen: {name: {x,y}}, spur, staub:Set, durchgang:Set, zettel, sprecher, ende, phase, stromausfall }
 export function zeichne(canvas, s) {
   const g = canvas.getContext('2d')
   g.imageSmoothingEnabled = false
@@ -168,7 +168,7 @@ export function klasseAnimator(canvas) {
     let bewegt = false
     if (szene.schreck && Date.now() > schreckBis) szene.schreck = null
     if (szene.schreck) bewegt = true
-    const zielLampe = szene.layout.nacht ? (szene.daemmerung ? 0.45 : 0) : 1
+    const zielLampe = szene.layout.nacht || szene.stromausfall ? (szene.daemmerung ? 0.45 : 0) : 1   // Stromausfall: Lampe aus, alle sitzen
     if (Math.abs(lampe - zielLampe) > .01) { lampe = reduziert ? zielLampe : lampe + (zielLampe - lampe) * .12; bewegt = true } else lampe = zielLampe
     for (const f of szene.layout.figuren) {
       const p = positionen[f.name] || (positionen[f.name] = { x: f.x, y: f.y })
@@ -191,4 +191,26 @@ export function klasseAnimator(canvas) {
       if (!laeuft) { laeuft = true; requestAnimationFrame(schritt) }
     },
   }
+}
+
+// --- Beschreibung fuer Screenreader ----------------------------------------------------------
+// Ein Satz zum Stand der Szene fuer das aria-label des Canvas (testbar ohne Browser).
+// z: { phase, nacht, lebende, verschwunden, keller, spieler, plaetze }
+const BEI_ORT = { 'Tür': 'an der Tür', 'Tafel': 'an der Tafel', 'Pulte': 'bei den Pulten', 'Fenster': 'am Fenster' }
+export function beschreibeSzene(z) {
+  const du = (n) => (n === z.spieler ? 'du' : n)
+  const liste = (l) => l.map(du).join(', ')
+  const teile = []
+  const kopf = z.phase === 'ende' ? 'Die Partie ist vorbei' : z.nacht ? `${z.phase === 'nacht' ? 'Nacht' : 'Tag'} ${z.nacht}` : 'Abend'
+  const lebende = z.lebende || []
+  if ((z.phase === 'nacht' || z.phase === 'morgen') && z.plaetze) {
+    const proOrt = {}
+    for (const n of lebende) { const o = z.plaetze[n]; if (o) (proOrt[o] ||= []).push(n) }
+    for (const o of Object.keys(BEI_ORT)) if (proOrt[o]) teile.push(`${BEI_ORT[o]}: ${liste(proOrt[o])}`)
+    const unbekannt = lebende.filter((n) => !z.plaetze[n])
+    if (unbekannt.length) teile.push(`Platz unbekannt: ${liste(unbekannt)}`)
+  } else if (lebende.length) teile.push(`im Raum: ${liste(lebende)}`)
+  if (z.verschwunden?.length) teile.push(`verschwunden: ${liste(z.verschwunden)}`)
+  if (z.keller?.length) teile.push(`im Keller: ${liste(z.keller)}`)
+  return `Das Klassenzimmer. ${kopf}${teile.length ? `, ${teile.join('; ')}` : ''}.`
 }

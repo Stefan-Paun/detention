@@ -22,6 +22,7 @@ function nachNacht(startwert = 3) {
 test('Spurentafel: aus der eigenen Sicht nur eigener Platz, Opfer-Platz und Spur; Behauptung wird gegen Wissen gehalten', () => {
   const { p, s, opfer } = nachNacht()
   const ich = NAMEN.find((n) => n !== s && n !== opfer)
+  if (p.dunkel) P.naechsteRunde(p)   // Stromausfall: Behauptungen erst, wenn das Licht wieder an ist
   P.sprechen(p, ich, 'Ich war bei der Tür.', null, behauptungAus('Ich war bei der Tür.'))
   const luegner = NAMEN.find((n) => n !== s && n !== opfer && n !== ich)
   const falsch = P.ORT_NAMEN.find((o) => o !== p.naechte[0].plaetze[luegner])
