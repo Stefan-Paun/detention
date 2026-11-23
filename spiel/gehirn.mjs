@@ -118,7 +118,9 @@ export function verlaufAlsText(ereignisse, ich) {
       case 'verschwunden': zeilen.push(`[Morgen ${e.nacht}] ${e.text}`); break
       case 'fund': zeilen.push(`[Morgen ${e.nacht}, Fund für alle sichtbar] ${e.text}`); break
       case 'zettel': zeilen.push(`[Morgen ${e.nacht}] Ein Zettel liegt unter der Tür, alle lesen ihn: „${e.text}“`); break
-      case 'hausmeister': case 'glocke': zeilen.push(`[Morgen ${e.nacht}] ${e.text}`); break
+      case 'hausmeister': case 'glocke': case 'stromausfall': zeilen.push(`[Morgen ${e.nacht}] ${e.text}`); break
+      case 'licht': zeilen.push(`[Gespräch] ${e.text}`); break
+      case 'im-dunkeln': zeilen.push(`[${fremd(e.wer, ich) ? `Nur ${e.wer} weiß das] Die Stimme im Dunkeln eben war ${e.wer}.` : 'Nur du weißt das] Die Stimme im Dunkeln eben warst du.'}`); break
       case 'untersucht': zeilen.push(`${e.von === ich ? 'Du untersuchst' : `${e.von} untersucht`} ${e.ort === KLASSENBUCH ? 'das Klassenbuch' : `den Platz ${bei(e.ort)}`}.`); break
       case 'ergebnis': zeilen.push(`[${fremd(e.wer, ich) ? `Nur ${e.wer} weiß das` : 'Nur du weißt das'}] ${e.text}`); break
       case 'diskussion': zeilen.push(`[Gespräch, Runde ${e.runde}${e.von ? ` von ${e.von}` : ''}]`); break

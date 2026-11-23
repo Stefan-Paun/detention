@@ -64,6 +64,8 @@ body.daemmerung .lampe { transition: none; }
 .zeile.ich .blase { border-radius: 14px 14px 4px 14px; background: #e9ddff; }
 .blase .wer { font-size: 12px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; margin-bottom: 2px; }
 .blase .wer small { font-weight: 500; text-transform: none; letter-spacing: 0; color: #5d6280; margin-left: 6px; }
+.zeile.dunkel .blase { background: var(--wand); color: var(--text); box-shadow: 0 2px 0 var(--linie); }
+.zeile.dunkel .blase .wer { color: var(--gedaempft); }
 .blase.still, .zeile.ich .blase.still { background: transparent; box-shadow: none; color: var(--gedaempft); font-style: italic; padding: 2px 0; }
 
 /* Regie-Zeilen und Karten */

@@ -14,6 +14,7 @@ export const SPRECHRUNDEN = STANDARD_REGELN.sprechrunden        // Diskussionsru
 export const MAX_NAECHTE = 10        // Notbremse gegen Endlosschleifen
 export const PETZE_JEDE = STANDARD_REGELN.petzeJede         // die Petze erfaehrt nur jede n-te Nacht etwas (1 = jede Nacht; Balance, siehe docs/balance-petze.md)
 export const MAX_UNTERSUCHUNGEN = STANDARD_REGELN.maxUntersuchungen  // pro Figur und Partie (sonst ist die Wahrheit zu billig)
+export const DUNKLE_STIMME = 'Eine Stimme im Dunkeln'   // Absender im sichtbaren Ereignis waehrend des Stromausfalls
 
 // `regeln`: Abweichungen vom Standard (spiel/regeln.mjs), nur fuer Labor und Tests. `petze`/`petzeJede`
 // direkt in den Optionen gehen wie bisher und haben Vorrang (neu: petzeJede wird wie jede Regel geprueft, 1 bis 10).
@@ -46,6 +47,8 @@ export function neuePartie(namen, zufall, { spieler = null, petze = null, petzeJ
     ergebnisse: {},                   // heutige Untersuchungsergebnisse je Figur (fuer Vorzeigen)
     vorgezeigt: [],                   // wer heute schon einen Beweis vorgezeigt hat
     offeneAbstimmung: false,          // Standard: geheim; die Glocke macht sie offen
+    dunkel: false,                    // Stromausfall: in der ersten Gespraechsrunde spricht man ohne Namen
+    imDunkeln: [],                    // wer im Dunkeln was gesagt hat (fuer die Wahrheit am Ende)
     stimmen: {},
     stichwahl: null,                  // Namen, die in der Stichwahl stehen (nur mit Regel gleichstand = 'stichwahl')
     ereignisse: [],
@@ -85,12 +88,24 @@ export function sprechen(p, von, text, an = null, behauptet = null) {
   if (!lebt(p, von)) throw new Error(`${von} ist nicht im Raum`)
   if (an && !lebt(p, an)) throw new Error(`${an} ist nicht im Raum`)
   if (behauptet && !istOrt(behauptet)) behauptet = null
+  if (imDunkeln(p)) {
+    // Stromausfall: alle hoeren den Satz, aber niemand sieht, wer spricht. Ansprechen geht nicht, und eine
+    // Platzbehauptung laesst sich keinem Namen zuordnen. Nur der Sprecher selbst (und Geister) wissen, wer es war.
+    const nr = p.ereignisse.length
+    melde(p, 'sagt', { von: DUNKLE_STIMME, an: null, text, behauptet: null, dunkel: true }, [...p.lebende])
+    melde(p, 'im-dunkeln', { wer: von, sagt: nr }, [von])
+    p.imDunkeln.push({ nacht: p.nacht, von, text })
+    return
+  }
   melde(p, 'sagt', { von, an, text, behauptet }, [...p.lebende])   // behauptet = genannter eigener Nachtplatz (kann gelogen sein)
 }
 
+// Ist gerade Stromausfall? Nur in der ersten Gespraechsrunde des Tages.
+export function imDunkeln(p) { return p.dunkel && p.phase === 'diskussion' && p.runde === 1 }
+
 export function schweigen(p, von) {
   pruefePhase(p, 'abend', 'diskussion')
-  melde(p, 'schweigt', { von }, [...p.lebende])
+  melde(p, 'schweigt', { von }, imDunkeln(p) ? [von] : [...p.lebende])   // im Dunkeln merkt niemand, wer schweigt
 }
 
 // --- Nacht -------------------------------------------------------------------------------
@@ -114,6 +129,7 @@ function nachtBeginnen(p) {
   p.vorgezeigt = []
   p.offeneAbstimmung = false
   p.stichwahl = null
+  p.dunkel = false
   p.rundenHeute = p.regeln.sprechrunden
   melde(p, 'nacht', { text: 'Die Lampe erlischt. Jeder sucht sich einen Platz.' })
   if (p.nacht > MAX_NAECHTE) throw new Error('Zu viele Nächte - Spiellogik hängt')
@@ -202,6 +218,7 @@ export function morgen(p) {
     melde(p, art, rest)
     if (ereignis.art === 'hausmeister') p.rundenHeute = 1
     if (ereignis.art === 'glocke') p.offeneAbstimmung = true
+    if (ereignis.art === 'stromausfall') p.dunkel = true
   }
   p.phase = 'diskussion'
   p.runde = 1
@@ -242,6 +259,7 @@ export function vorzeigen(p, wer) {
 
 export function naechsteRunde(p) {
   pruefePhase(p, 'diskussion')
+  if (p.dunkel) { p.dunkel = false; melde(p, 'licht', { text: 'Das Licht flackert wieder an. Ab jetzt sieht man wieder, wer spricht.' }) }
   if (p.runde >= p.rundenHeute) {
     p.phase = 'abstimmung'
     melde(p, 'abstimmung', { text: p.offeneAbstimmung ? 'Wer kommt in den Keller? Heute offen: Jeder sieht sofort, wer wie stimmt.' : 'Wer kommt in den Keller? Jeder schreibt seinen Namen auf einen Zettel, gezeigt wird erst am Ende.', offen: p.offeneAbstimmung })
@@ -307,7 +325,7 @@ function siegPruefen(p, { nachAbstimmung = false } = {}) {
   p.phase = 'ende'
   melde(p, 'ende', { sieger: p.sieger, schatten: s, ...(grund ? { grund } : {}) })
   // Die Wahrheit: alle Rollen und wer in welcher Nacht wo stand
-  melde(p, 'wahrheit', { rollen: { ...p.rollen }, naechte: p.naechte.map((n) => ({ nacht: n.nacht, plaetze: { ...n.plaetze }, schatten: n.schatten, opfer: n.opfer, verwischt: !!n.verwischt })) })
+  melde(p, 'wahrheit', { rollen: { ...p.rollen }, naechte: p.naechte.map((n) => ({ nacht: n.nacht, plaetze: { ...n.plaetze }, schatten: n.schatten, opfer: n.opfer, verwischt: !!n.verwischt })), imDunkeln: p.imDunkeln.map((d) => ({ ...d })) })
   return true
 }
 

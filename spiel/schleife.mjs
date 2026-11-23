@@ -72,7 +72,7 @@ export async function spieleBisZumEnde(p, gehirne, { zufall, beobachter = () => 
           const a = await gehirne[n].diskussion(sicht(n), p.lebende)
           if (a.art === 'schweigt') P.schweigen(p, n); else P.sprechen(p, n, a.text, a.an ?? null, a.behauptet ?? behauptungAus(a.text))   // Rueckfall: Platz aus dem Satz lesen
           melde(); await pause()
-          if (a.art === 'sagt' && a.an && reihe.includes(a.an)) { reihe.splice(reihe.indexOf(a.an), 1); reihe.unshift(a.an) }
+          if (a.art === 'sagt' && a.an && !P.imDunkeln(p) && reihe.includes(a.an)) { reihe.splice(reihe.indexOf(a.an), 1); reihe.unshift(a.an) }   // im Dunkeln spricht niemand jemanden an
         }
         P.naechsteRunde(p); melde()
       }

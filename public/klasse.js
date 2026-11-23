@@ -73,7 +73,7 @@ export function zeichneFigur(g, x, y, look, px = 1, { dunkel = false } = {}) {
   if (frisur === 'kurz') r(3, 1, 6, 1, haar)
 }
 
-// szene: { layout, looks, spieler, lampe (0..1), positionen: {name: {x,y}}, spur, staub:Set, durchgang:Set, zettel, sprecher, ende, phase }
+// szene: { layout, looks, spieler, lampe (0..1), positionen: {name: {x,y}}, spur, staub:Set, durchgang:Set, zettel, sprecher, ende, phase, stromausfall }
 export function zeichne(canvas, s) {
   const g = canvas.getContext('2d')
   g.imageSmoothingEnabled = false
@@ -168,7 +168,7 @@ export function klasseAnimator(canvas) {
     let bewegt = false
     if (szene.schreck && Date.now() > schreckBis) szene.schreck = null
     if (szene.schreck) bewegt = true
-    const zielLampe = szene.layout.nacht ? (szene.daemmerung ? 0.45 : 0) : 1
+    const zielLampe = szene.layout.nacht || szene.stromausfall ? (szene.daemmerung ? 0.45 : 0) : 1   // Stromausfall: Lampe aus, alle sitzen
     if (Math.abs(lampe - zielLampe) > .01) { lampe = reduziert ? zielLampe : lampe + (zielLampe - lampe) * .12; bewegt = true } else lampe = zielLampe
     for (const f of szene.layout.figuren) {
       const p = positionen[f.name] || (positionen[f.name] = { x: f.x, y: f.y })

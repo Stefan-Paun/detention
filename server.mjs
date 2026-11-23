@@ -150,7 +150,8 @@ export function erstelleServer({ gehirnFabrik, hefte = null, figuren: eigene = n
 
   // KI-Gehirne melden vorher "tippt", damit der Browser Leben zeigt
   function mitTippen(g, n, sp) {
-    const melde = (daten) => { if (!sp.beendet) sende('tippt', daten) }
+    // Im Stromausfall verriete "X überlegt" den Sprecher: dann nur Zuschauer informieren (alle Leitungen sehen dasselbe)
+    const melde = (daten) => { if (!sp.beendet && (sp.zuschauen || !P.imDunkeln(sp.p))) sende('tippt', daten) }
     const h = (fn) => async (...a) => { melde({ von: n }); try { return await fn(...a) } finally { melde({ von: n, fertig: true }) } }
     return { ...g, abend: h(g.abend), nacht: g.nacht, diskussion: h(g.diskussion), abstimmung: h(g.abstimmung) }
   }

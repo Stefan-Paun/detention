@@ -294,3 +294,38 @@ test('Server: eine abgelehnte neue Partie (doppelter Name) laesst die laufende P
     assert.ok(ev.length > 0)
   } finally { await s.schliessen() }
 })
+
+test('Server: Stromausfall verraet den Sprecher weder per tippt noch per Ereignis', async () => {
+  // Startwert 1: Stromausfall in einer Spieler-Partie, waehrend Stefan noch im Raum ist (prueft die erste Zusicherung)
+  for (const startwert of [1]) {
+    const s = erstelleServer({ gehirnFabrik: fabrik, port: 0, pause: 0, startwert })
+    const port = await s.starten()
+    try {
+      await post(port, '/partie', { name: 'Stefan' })
+      const ev = await sse(port, (l) => l.some((e) => e.art === 'status' && e.daten?.phase === 'ende'), {
+        auf: async (e) => {
+          const w = e.art === 'warte' ? e.daten : e.art === 'status' ? e.daten?.warte : null
+          if (!w) return
+          if (w.art === 'sagen') await post(port, '/aktion', { art: 'sagt', text: 'Ich war am Fenster.', an: w.andere[0] })
+          else if (w.art === 'stimme') await post(port, '/aktion', { fuer: null })
+          else if (w.art === 'nacht') await post(port, '/aktion', { platz: w.orte[0], ziel: w.optionen[0] })
+          else if (w.art === 'untersuchen') await post(port, '/aktion', { ort: null })
+          else if (w.art === 'zeigen') await post(port, '/aktion', { zeigen: false })
+        }, zeit: 15000,
+      })
+      const p = s.partie()
+      const strom = p.ereignisse.find((e) => e.art === 'stromausfall')
+      assert.ok(strom && !p.verschwunden.concat(p.keller).slice(0, strom.nacht).includes('Stefan'), 'Startwert liefert keinen Stromausfall mit Stefan im Raum')
+      const i = ev.findIndex((e) => e.art === 'ereignis' && e.daten.art === 'stromausfall')
+      const j = ev.findIndex((e, k) => k > i && e.art === 'ereignis' && e.daten.art === 'licht')
+      assert.ok(i >= 0 && j > i)
+      const fenster = ev.slice(i, j)
+      assert.ok(!fenster.some((e) => e.art === 'tippt'), 'im Dunkeln kein "X überlegt"')
+      const dunkel = fenster.filter((e) => e.art === 'ereignis' && e.daten.art === 'sagt')
+      assert.ok(dunkel.length > 0)
+      assert.ok(dunkel.every((e) => e.daten.von === 'Eine Stimme im Dunkeln' && e.daten.an === null))
+      assert.ok(fenster.filter((e) => e.art === 'ereignis' && e.daten.art === 'im-dunkeln').every((e) => e.daten.wer === 'Stefan'), 'fremde Sprecher bleiben geheim')
+      assert.ok(fenster.some((e) => e.art === 'ereignis' && e.daten.art === 'im-dunkeln' && e.daten.wer === 'Stefan'), 'Stefan erfaehrt, dass er es war')
+    } finally { await s.schliessen() }
+  }
+})

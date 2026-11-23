@@ -38,7 +38,9 @@ export function lokalerSpielleiter({ pause = 900, denkzeit = [400, 1100], startw
   function mitTippen(g, n, sp) {
     const melde = meldeFuer(sp)
     const denken = () => (denkzeit[1] > 0 ? schlafe(denkzeit[0] + Math.random() * (denkzeit[1] - denkzeit[0])) : Promise.resolve())
-    const h = (fn) => async (...a) => { melde('tippt', { von: n }); try { await denken(); return fn(...a) } finally { melde('tippt', { von: n, fertig: true }) } }
+    // Im Stromausfall verriete "X überlegt" den Sprecher (wie im Server)
+    const tippt = (daten) => { if (sp.zuschauen || !P.imDunkeln(sp.p)) melde('tippt', daten) }
+    const h = (fn) => async (...a) => { tippt({ von: n }); try { await denken(); return fn(...a) } finally { tippt({ von: n, fertig: true }) } }
     return { ...g, abend: h(g.abend), nacht: g.nacht, diskussion: h(g.diskussion), abstimmung: h(g.abstimmung) }
   }
 

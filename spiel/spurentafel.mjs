@@ -31,7 +31,7 @@ export function wissenAus(ereignisse, ich) {
         if (e.typ === 'staub') w.staub.add(e.ort)
         break
       case 'zettel': w.zettel = e.ort; w.funde.push(`Zettel: ${e.text}`); break
-      case 'hausmeister': case 'glocke': w.funde.push(e.text); break
+      case 'hausmeister': case 'glocke': case 'stromausfall': w.funde.push(e.text); break
       case 'ergebnis':
         if (e.ort === KLASSENBUCH) { if (e.name && e.platz) w.plaetze[e.name] = e.platz }
         else { for (const n of e.namen || []) w.plaetze[n] = e.ort; if (e.durchgang) w.durchgang.add(e.ort) }
