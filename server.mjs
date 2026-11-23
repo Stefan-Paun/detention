@@ -20,6 +20,7 @@ import { hefteSpeicher } from './spiel/hefte.mjs'
 import { figurenSpeicher } from './spiel/figurenspeicher.mjs'
 import { pruefeFigur, kennung, MAX_EIGENE, GRENZEN } from './spiel/figurenschema.mjs'
 import { browserModule } from './tools/seite.mjs'
+import { protokollText } from './spiel/protokoll.mjs'
 
 const HIER = path.dirname(fileURLToPath(import.meta.url))
 let browserDateien = null   // Set der Module aus spiel/, die der Browser laden darf (tools/seite.mjs)
@@ -99,12 +100,13 @@ export function erstelleServer({ gehirnFabrik, hefte = null, figuren: eigene = n
     const ki = besetzen(besetzung)
     const namen = [...ki.map((f) => f.name), zuschauen ? ZUSCHAUER_ERSATZ : spieler]
     if (new Set(namen.map((n) => n.toLowerCase())).size !== namen.length) throw new Error('Der Name ist schon vergeben')
-    const z = zufall(startwert ?? Date.now())
+    const sw = startwert ?? Date.now()
+    const z = zufall(sw)
     const p = P.neuePartie(namen, z, { spieler })
     const datenVon = Object.fromEntries(ki.map((f) => [f.name, f]))
     const figuren = Object.fromEntries(namen.map((n) => [n, n === spieler ? { haut: '#f1cfb0', haar: '#2b2118', frisur: 'wuschel', shirt: '#bd93f9' } : (datenVon[n] ?? ladeFigur(n)).aussehen]))
     const gehirne = {}
-    const meins = { p, spieler, zuschauen, mensch: null, figuren: figuren, gehirne, hefteGeschrieben: false, beendet: false }
+    const meins = { p, spieler, zuschauen, mensch: null, figuren: figuren, gehirne, hefteGeschrieben: false, beendet: false, startwert: sw }
     for (const n of namen) {
       if (n === spieler) { meins.mensch = browserGehirn(n, p.rollen[n], { sende }); gehirne[n] = meins.mensch }
       else {
@@ -225,6 +227,12 @@ export function erstelleServer({ gehirnFabrik, hefte = null, figuren: eigene = n
         // Nur zwischen den Partien lesbar - waehrend des Spiels wuesste der Spieler sonst, wer ihm misstraut
         if (!hefte || (spiel && spiel.p.phase !== 'ende')) { res.writeHead(403, { 'content-type': 'application/json' }).end(JSON.stringify({ fehler: 'Hefte gibt es erst nach der Partie' })); return }
         res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(hefte.alle([...KI_FIGUREN, ZUSCHAUER_ERSATZ])))
+        return
+      }
+      if (req.method === 'GET' && url.pathname === '/protokoll') {
+        // Erst nach dem Ende: dann ist alles, was drinsteht, ohnehin aufgedeckt. Nie Hefte, nie Schluessel (spiel/protokoll.mjs).
+        if (!spiel || spiel.p.phase !== 'ende') { res.writeHead(409, { 'content-type': 'application/json' }).end(JSON.stringify({ ok: false, fehler: 'Das Protokoll gibt es erst nach der Partie' })); return }
+        res.writeHead(200, { 'content-type': 'text/markdown; charset=utf-8', 'content-disposition': 'attachment; filename="nachsitzen-protokoll.md"' }).end(protokollText(spiel.p, { startwert: spiel.startwert }))
         return
       }
       if (req.method === 'GET' && url.pathname === '/verlauf') {

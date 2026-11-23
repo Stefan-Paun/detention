@@ -6,6 +6,7 @@
 import { zufall } from '../spiel/zufall.mjs'
 import * as P from '../spiel/partie.mjs'
 import { spieleBisZumEnde } from '../spiel/schleife.mjs'
+import { protokollText } from '../spiel/protokoll.mjs'
 import { browserGehirn } from '../spiel/browsergehirn.mjs'
 import { skriptGehirn } from '../spiel/skriptgehirne.mjs'
 import { ORT_NAMEN, KLASSENBUCH } from '../spiel/welt.mjs'
@@ -48,10 +49,11 @@ export function lokalerSpielleiter({ pause = 900, denkzeit = [400, 1100], startw
     const spieler = zuschauen ? null : pruefeName(name)
     const namen = [...KI_FIGUREN, zuschauen ? ZUSCHAUER_ERSATZ : spieler]
     if (new Set(namen.map((n) => n.toLowerCase())).size !== namen.length) throw new Error('Der Name ist schon vergeben')
-    const z = zufall(startwert ?? Date.now())
+    const sw = startwert ?? Date.now()
+    const z = zufall(sw)
     const p = P.neuePartie(namen, z, { spieler })
     const figuren = Object.fromEntries(namen.map((n) => [n, n === spieler ? SPIELER_AUSSEHEN : AUSSEHEN[n]]))
-    const sp = { p, spieler, zuschauen: !!zuschauen, mensch: null, figuren, beendet: false }
+    const sp = { p, spieler, zuschauen: !!zuschauen, mensch: null, figuren, beendet: false, startwert: sw }
     const melde = meldeFuer(sp)
     const mitPetze = !!P.petze(p)
     const gehirne = {}
@@ -89,5 +91,7 @@ export function lokalerSpielleiter({ pause = 900, denkzeit = [400, 1100], startw
     beenden,
     lauf: () => spiel?.lauf ?? Promise.resolve(),
     partieObjekt: () => spiel?.p ?? null,
+    // Wie GET /protokoll im Server: erst nach dem Ende, sonst null
+    protokoll: () => (spiel && spiel.p.phase === 'ende' ? protokollText(spiel.p, { startwert: spiel.startwert }) : null),
   }
 }

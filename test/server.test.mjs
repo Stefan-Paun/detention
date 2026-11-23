@@ -329,3 +329,53 @@ test('Server: Stromausfall verraet den Sprecher weder per tippt noch per Ereigni
     } finally { await s.schliessen() }
   }
 })
+
+test('Server: /protokoll erst nach dem Ende, ohne Hefte und ohne Schluessel', async () => {
+  const ordner = fs.mkdtempSync(path.join(os.tmpdir(), 'ns-srv-protokoll-'))
+  const hefte = hefteSpeicher({ ordner })
+  const MARKER = ['GEHEIM', 'HEFT'].join('-')
+  hefte.schreiben('Mira', { eintrag: `${MARKER}: Stefan wirkt nervös.`, vertrauen: { Stefan: -2 } })
+  const fabrikMitHeft = (name, rolle, opts) => {
+    const g = skriptGehirn(name, rolle, opts.zufall)
+    g.heftSchreiben = async () => ({ eintrag: `${MARKER} neu`, vertrauen: {} })
+    return g
+  }
+  const schluessel = ['sk', 'ant', 'test', 'nie', 'im', 'protokoll'].join('-')   // nur zur Laufzeit zusammengesetzt
+  const alt = process.env.ANTHROPIC_API_KEY
+  process.env.ANTHROPIC_API_KEY = schluessel
+  const s = erstelleServer({ gehirnFabrik: fabrikMitHeft, hefte, port: 0, pause: 0, startwert: 9 })
+  const port = await s.starten()
+  try {
+    assert.equal((await fetch(`http://127.0.0.1:${port}/protokoll`)).status, 409, 'ohne Partie')
+    await post(port, '/partie', { name: 'Stefan' })
+    const vorher = await fetch(`http://127.0.0.1:${port}/protokoll`)
+    assert.equal(vorher.status, 409, 'waehrend der Partie (sie wartet auf Stefans ersten Satz)')
+    assert.match((await vorher.json()).fehler, /erst nach der Partie/)
+    await sse(port, (l) => l.some((e) => e.art === 'hefte'), {
+      auf: async (e) => {
+        const w = e.art === 'warte' ? e.daten : e.art === 'status' ? e.daten?.warte : null
+        if (!w) return
+        if (w.art === 'sagen') await post(port, '/aktion', { art: 'sagt', text: 'Ich war an der Tafel.' })
+        else if (w.art === 'stimme') await post(port, '/aktion', { fuer: w.optionen[0] })
+        else if (w.art === 'nacht') await post(port, '/aktion', { platz: w.orte[1], ziel: w.optionen[0] })
+        else if (w.art === 'untersuchen') await post(port, '/aktion', { ort: w.orte[0] })
+        else if (w.art === 'zeigen') await post(port, '/aktion', { zeigen: false })
+      }, zeit: 15000,
+    })
+    assert.equal(s.partie().phase, 'ende')
+    const r = await fetch(`http://127.0.0.1:${port}/protokoll`)
+    assert.equal(r.status, 200)
+    assert.match(r.headers.get('content-type'), /^text\/markdown/)
+    assert.match(r.headers.get('content-disposition'), /attachment; filename="nachsitzen-protokoll\.md"/)
+    const t = await r.text()
+    assert.match(t, /Startwert: 9/)
+    assert.match(t, /## Nacht 1/)
+    assert.match(t, /Die Schüler haben gewonnen|Der Schatten hat gewonnen/)
+    assert.match(t, /\*\*Stefan\*\*: Ich war an der Tafel\./)
+    assert.ok(!t.includes(MARKER), 'nie ein Hefteintrag')
+    assert.ok(!t.includes(schluessel) && !/sk-ant/.test(t), 'nie der Schluessel')
+  } finally {
+    await s.schliessen()
+    if (alt === undefined) delete process.env.ANTHROPIC_API_KEY; else process.env.ANTHROPIC_API_KEY = alt
+  }
+})

@@ -283,6 +283,22 @@ async function hefteLesen() {
   if (!k.querySelector('p')) kartenZeile(k, 'Noch leer. Nach der ersten Partie mit echten Figuren steht hier etwas.')
 }
 $('heftknopf').onclick = hefteLesen
+// --- Protokoll: die ganze Partie als Markdown-Datei (ohne Hefte, ohne Schluessel) ------------
+async function protokollSpeichern() {
+  let text
+  if (DEMO) text = leiter?.protokoll()
+  else {
+    const r = await fetch('/protokoll')
+    if (!r.ok) { $('fehler').textContent = (await r.json().catch(() => ({}))).fehler || 'Kein Protokoll'; return }
+    text = await r.text()
+  }
+  if (!text) { $('fehler').textContent = 'Das Protokoll gibt es erst nach der Partie'; return }
+  const url = URL.createObjectURL(new Blob([text], { type: 'text/markdown;charset=utf-8' }))
+  const a = document.createElement('a'); a.href = url; a.download = 'nachsitzen-protokoll.md'
+  document.body.appendChild(a); a.click(); a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+$('protokollknopf').onclick = protokollSpeichern
 function marke(d, klasse, text) { const m = document.createElement('div'); m.className = `marke ${klasse}`; m.textContent = text; d.appendChild(m) }
 function fuelle(ul, eintraege, leer) {
   ul.innerHTML = ''
@@ -319,6 +335,7 @@ function zeigeKlasse() {
   $('lampe').classList.toggle('aus', status.phase === 'nacht' || dunkel)
   $('neu').hidden = false
   $('heftknopf').hidden = !(status.hefte && status.phase === 'ende')
+  $('protokollknopf').hidden = status.phase !== 'ende'
   if (status.rolle && !$('meinerolle').textContent) $('meinerolle').textContent = `Deine Rolle: ${ROLLE[status.rolle]}. ${ROLLE_ERKLAERT[status.rolle] || ''}`
 }
 
@@ -403,7 +420,7 @@ async function starten(zuschauen) {
 if (!DEMO) starteEditor({ onAenderung: (ok) => { for (const b of document.querySelectorAll('#startform button[type="submit"], #zuschauen')) b.disabled = !ok } }).catch(() => {})
 $('startform').onsubmit = (ev) => { ev.preventDefault(); starten(false) }
 $('zuschauen').onclick = () => starten(true)
-$('neu').onclick = () => { $('raum').hidden = true; $('eingabe').hidden = true; $('start').hidden = false; $('neu').hidden = true; quelle?.close(); quelle = null; leiter?.beenden() }
+$('neu').onclick = () => { $('protokollknopf').hidden = true; $('heftknopf').hidden = true; $('raum').hidden = true; $('eingabe').hidden = true; $('start').hidden = false; $('neu').hidden = true; quelle?.close(); quelle = null; leiter?.beenden() }
 
 // Was mit jeder Nachricht passiert, egal ob sie vom Server-Stream oder vom lokalen Spielleiter kommt
 const EMPFANG = {

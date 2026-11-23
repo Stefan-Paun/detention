@@ -9,6 +9,7 @@
 //   node tools/zug.mjs <port> --stimme Nora|niemand        (geheim; wird erst am Ende aufgedeckt)
 //   node tools/zug.mjs <port> --hefte                 nach dem Ende: die Hefte der Figuren
 //   node tools/zug.mjs <port> --tafel                 Spurentafel: was ich über die letzte Nacht sicher weiß
+//   node tools/zug.mjs <port> --protokoll             nach dem Ende: die ganze Partie als Markdown (ohne Hefte)
 // Jeder Aufruf druckt danach, was seit dem letzten Aufruf passiert ist (aus Sicht des Spielers).
 
 import fs from 'node:fs'
@@ -59,6 +60,13 @@ if (arg('--tafel')) {
   const v = await netz(basis + '/verlauf?ab=0').then(json)
   if (!v.status) { console.log('Keine Partie. Starte mit --neu.'); process.exit(0) }
   console.log(spurentafelText(v.ereignisse, v.status.spieler ?? '', v.status.lebende))
+  process.exit(0)
+}
+
+if (arg('--protokoll')) {
+  const r = await netz(basis + '/protokoll')
+  if (!r.ok) { console.log((await r.json().catch(() => ({}))).fehler || `Kein Protokoll (HTTP ${r.status})`); process.exit(r.status === 409 ? 0 : 1) }
+  process.stdout.write(await r.text())
   process.exit(0)
 }
 
