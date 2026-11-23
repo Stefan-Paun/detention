@@ -112,3 +112,18 @@ test('Simulation: 300 Skript-Partien mit Stromausfall laufen ohne Fehler, kein N
   assert.ok(dunkleTage > 20, `nur ${dunkleTage} Stromausfaelle in 300 Partien`)
   assert.ok(saetze > 20, `nur ${saetze} Saetze im Dunkeln`)
 })
+
+test('Stromausfall: Mensch bekommt dunkel in der Frage, zug.mjs bietet kein --an an', async () => {
+  const { browserGehirn } = await import('../spiel/browsergehirn.mjs')
+  const { hinweisFuer } = await import('../tools/zughinweis.mjs')
+  const fragen = []
+  const g = browserGehirn('Stefan', 'schueler', { sende: (art, d) => { if (art === 'warte') fragen.push(d) } })
+  g.diskussion([{ art: 'stromausfall' }], NAMEN)
+  assert.equal(g.wartetAuf().dunkel, true)
+  assert.doesNotMatch(hinweisFuer(g.wartetAuf()), /--an Mira/)
+  assert.match(hinweisFuer(g.wartetAuf()), /Stromausfall/)
+  g.aktion({ art: 'schweigt' })
+  g.diskussion([{ art: 'stromausfall' }, { art: 'licht' }], NAMEN)
+  assert.equal(g.wartetAuf().dunkel, undefined)
+  assert.match(hinweisFuer(g.wartetAuf()), /--an Mira/)
+})

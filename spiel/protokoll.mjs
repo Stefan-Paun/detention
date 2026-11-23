@@ -31,9 +31,8 @@ export function protokollText(p, { startwert = null } = {}) {
   const imDunkeln = new Map()
   for (const e of p.ereignisse) if (e.art === 'im-dunkeln') imDunkeln.set(e.sagt, e.wer)
 
-  const alle = p.namen.length
   for (const e of p.ereignisse) {
-    const oeffentlich = e.sichtbar.length > 1 || alle <= 1
+    const oeffentlich = e.sichtbar.length > 1   // private Ereignisse sieht genau eine Figur
     switch (e.art) {
       case 'start': z.push('', '## Abend', '', `- ${zeile(e.text)}`); break
       case 'nacht': {

@@ -17,7 +17,8 @@ export function browserGehirn(name, rolle, { sende }) {
   return {
     name, rolle,
     abend: (sicht, lebende) => frage({ art: 'sagen', pflicht: true, andere: andere(lebende) }),
-    diskussion: (sicht, lebende) => frage({ art: 'sagen', pflicht: false, andere: andere(lebende) }),
+    // dunkel: Stromausfall in dieser Runde (niemand sieht, wer spricht; ansprechen geht nicht)
+    diskussion: (sicht, lebende) => frage({ art: 'sagen', pflicht: false, andere: andere(lebende), ...(sicht.findLast((x) => x.art === 'stromausfall' || x.art === 'licht' || x.art === 'nacht')?.art === 'stromausfall' ? { dunkel: true } : {}) }),
     nacht: (sicht, lebende, { orte, ziele, verwischen, petzeAktiv }) => frage({ art: 'nacht', aufgabe: rolle === SCHATTEN ? 'holen' : rolle === SCHLUESSEL ? 'pruefen' : rolle === PETZE && petzeAktiv !== false ? 'erfragen' : 'verstecken', orte, optionen: ziele ?? andere(lebende), verwischen: !!verwischen }),
     untersuchen: (sicht, lebende, { orte, uebrig }) => frage({ art: 'untersuchen', orte, uebrig }),
     zeigen: (sicht, lebende, { ergebnis }) => frage({ art: 'zeigen', ergebnis: ergebnis.text }),

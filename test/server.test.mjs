@@ -315,7 +315,7 @@ test('Server: Stromausfall verraet den Sprecher weder per tippt noch per Ereigni
       })
       const p = s.partie()
       const strom = p.ereignisse.find((e) => e.art === 'stromausfall')
-      assert.ok(strom && !p.verschwunden.concat(p.keller).slice(0, strom.nacht).includes('Stefan'), 'Startwert liefert keinen Stromausfall mit Stefan im Raum')
+      assert.ok(strom, 'Startwert liefert keinen Stromausfall')   // dass Stefan im Raum war, zeigt sein eigenes im-dunkeln unten
       const i = ev.findIndex((e) => e.art === 'ereignis' && e.daten.art === 'stromausfall')
       const j = ev.findIndex((e, k) => k > i && e.art === 'ereignis' && e.daten.art === 'licht')
       assert.ok(i >= 0 && j > i)

@@ -340,15 +340,16 @@ function zeigeKlasse() {
 }
 
 // --- Eingabe -------------------------------------------------------------------------
+let letzteFrage = null
 function zeigeWarte(w) {
   const sagen = $('sagen'), wahl = $('wahl'), hinweis = $('hinweis')
   sagen.hidden = true; wahl.hidden = true; wahl.innerHTML = ''
-  if (!w) { hinweis.textContent = status?.spieler && status.phase !== 'ende' ? 'Die anderen reden …' : ''; return }
+  if (!w) { letzteFrage = null; hinweis.textContent = status?.spieler && status.phase !== 'ende' ? 'Die anderen reden …' : ''; return }
   if (w.art === 'sagen') {
-    hinweis.textContent = w.pflicht ? 'Sag einen Satz zum Anfang.' : dunkel ? 'Du bist dran. Stromausfall: Niemand sieht, wer spricht. Sag etwas oder schweig.' : 'Du bist dran. Sag etwas oder schweig.'
+    hinweis.textContent = w.pflicht ? 'Sag einen Satz zum Anfang.' : (w.dunkel || dunkel) ? 'Du bist dran. Stromausfall: Niemand sieht, wer spricht. Sag etwas oder schweig.' : 'Du bist dran. Sag etwas oder schweig.'
     const an = $('an'); an.innerHTML = '<option value="">an alle</option>'
     for (const n of w.andere) { const o = document.createElement('option'); o.value = n; o.textContent = `zu ${n}`; an.appendChild(o) }
-    an.hidden = dunkel   // im Dunkeln kann man niemanden direkt ansprechen
+    an.hidden = !!(w.dunkel || dunkel)   // im Dunkeln kann man niemanden direkt ansprechen
     $('schweigen').hidden = w.pflicht
     sagen.hidden = false; $('text').focus()
     return
@@ -363,7 +364,7 @@ function zeigeWarte(w) {
       let verwischen = false
       if (w.verwischen) { const b = knopf(wahl, 'Spur verwischen: aus', () => { verwischen = !verwischen; b.textContent = `Spur verwischen: ${verwischen ? 'an' : 'aus'}`; b.classList.toggle('leise', !verwischen) }, 'leise'); b.title = 'Einmal pro Partie. Keine Richtung, kein Kreidestaub, aber Nachbarn merken, dass du lange weg warst.' }
       for (const n of w.optionen) knopf(wahl, n, () => sende({ platz: o, ziel: n, verwischen }))
-      wahl.querySelector('button')?.focus()
+      wahl.querySelector('button:not(.leise)')?.focus()
     })
   } else if (w.art === 'zeigen') {
     hinweis.textContent = `Willst du dein Ergebnis allen vorzeigen? „${w.ergebnis}“ Vorgezeigt gilt es als bewiesen.`
@@ -378,7 +379,10 @@ function zeigeWarte(w) {
     for (const n of w.optionen) knopf(wahl, n, () => sende({ fuer: n }))
     knopf(wahl, 'niemand', () => sende({ fuer: null }), 'leise')
   }
-  wahl.querySelector('button')?.focus()
+  // Fokus nur bei einer neuen Frage, nicht bei jedem Status-Update (sonst springt er zurueck)
+  const schluessel = JSON.stringify(w)
+  if (schluessel !== letzteFrage) wahl.querySelector('button:not(.leise)')?.focus()
+  letzteFrage = schluessel
 }
 function knopf(wo, text, tu, extra = '') { const b = document.createElement('button'); b.className = `knopf ${extra}`; b.type = 'button'; b.textContent = text; b.onclick = tu; wo.appendChild(b); return b }
 function ortKnopf(wo, ort, tu) {
