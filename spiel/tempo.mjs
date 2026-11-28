@@ -49,7 +49,7 @@ export function tempoAktion(sp, { art, wert } = {}) {
   if (!sp) return 'Keine laufende Partie'
   if (!sp.zuschauen) return 'Tempo und Pause gibt es nur beim Zuschauen'
   if (art === 'tempo') {
-    if (!Object.hasOwn(TEMPO, wert)) return `Tempo: ${Object.keys(TEMPO).join(', ')}`
+    if (typeof wert !== 'string' || !Object.hasOwn(TEMPO, wert)) return `Tempo: ${Object.keys(TEMPO).join(', ')}`
     sp.tempo = wert
     return null
   }

@@ -19,7 +19,7 @@ test('Beziehungen: jede mitgelieferte Figur kennt jede andere, gegenseitig und o
 })
 
 test('Beziehungen: Saetze bleiben in den Grenzen (kein Blut, keine Gewalt, nichts Sexuelles, keine Rollen)', () => {
-  const verboten = /\b(blut\w*|tot\w*|töt\w*|umbring\w*|mord\w*|suizid|selbstmord|ritz\w*|sex\w*|küss\w*|verliebt|schatten|schlüsselträger|petze)\b/i
+  const verboten = /\b(bekommt es mit mir zu tun|schlag\w*|prügel\w*|droh\w*|blut\w*|tot\w*|töt\w*|umbring\w*|mord\w*|suizid|selbstmord|ritz\w*|sex\w*|küss\w*|verliebt|schatten|schlüsselträger|petze)\b/i
   for (const [n, f] of Object.entries(alle)) {
     for (const [k, satz] of Object.entries(f.kennt)) {
       assert.ok(!verboten.test(satz), `${n} ueber ${k}: „${satz}“`)
@@ -35,7 +35,9 @@ test('Beziehungen: Systemprompt enthaelt nur Saetze ueber anwesende Mitspieler, 
   for (const n of ['Jonas', 'Lea', 'Tarik', 'Nora', 'Sam']) assert.ok(voll.includes(`- ${n}: ${mira.kennt[n]}`), n)
   assert.ok(!voll.includes(mira.kennt.Ben), 'Ben ist nicht im Raum')
   assert.ok(!/\{\{\w+\}\}/.test(voll), 'kein unersetzter Platzhalter')
-  assert.ok(voll.indexOf('## Was du über die anderen weißt') < voll.indexOf('## Deine Rolle'), 'vor Heft und Rolle')
+  assert.ok(voll.indexOf('## Was du über die anderen weißt') < voll.indexOf('## Deine Rolle'), 'vor der Rolle')
+  const mitHeft = systemPrompt(mira, SCHUELER, ['Mira', 'Jonas', 'Lea', 'Alex'], 'Alex', '- 2026-01-01: Ein alter Eintrag.')
+  assert.ok(mitHeft.indexOf('## Was du über die anderen weißt') < mitHeft.indexOf('## Dein Heft'), 'vor dem Heft')
 
   // Kleine Besetzung ohne Tarik und Nora; der Mensch heisst wie eine Figur, die nicht mitspielt
   const klein = systemPrompt(mira, SCHUELER, ['Mira', 'Jonas', 'Lea', 'Tarik'], 'Tarik')

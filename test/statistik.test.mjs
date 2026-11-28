@@ -153,3 +153,17 @@ test('Server: Mitspiel-Partie schreibt genau eine Zeile und meldet die Bilanz, Z
     assert.equal((await (await fetch(`http://127.0.0.1:${port}/status`)).json()).bilanz, null)
   } finally { await s.schliessen() }
 })
+
+test('Statistik: bei einer Stichwahl zaehlt nur die letzte Zettelwahl des Tages', () => {
+  const ev = [
+    { art: 'zettelwahl', nacht: 1, stimmen: { Mira: 'Alex', Jonas: 'Lea', Lea: 'Alex', Alex: 'Lea' } },
+    { art: 'zettelwahl', nacht: 1, stimmen: { Mira: 'Alex', Jonas: 'Lea', Lea: 'Lea', Alex: 'Lea' } },
+    { art: 'eingesperrt', nacht: 1, name: 'Lea', rolle: 'schatten' },
+    { art: 'ende', sieger: 'schueler', schatten: 'Lea' },
+    { art: 'wahrheit', rollen: { Mira: 'schueler', Jonas: 'schueler', Lea: 'schatten', Alex: 'schueler' }, naechte: [{ nacht: 1 }] },
+  ]
+  const z = partieZeile(ev, 'Alex', '2026-01-01')
+  assert.deepEqual(z.gegen, { Mira: 1 })
+  assert.deepEqual(z.eingesperrtMit, ['Lea'])
+  assert.equal(z.gewonnen, true)
+})

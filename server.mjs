@@ -224,6 +224,11 @@ export function erstelleServer({ gehirnFabrik, hefte = null, figuren: eigene = n
         } else res.write(sseZeile('status', null))
         return
       }
+      // Schreibende Spielrouten: nur von der eigenen Seite oder ohne Browser (curl, zug.mjs). Sonst koennte eine
+      // fremde Webseite per text/plain-POST ohne Preflight eine Partie starten, Zuege abgeben oder pausieren.
+      if (req.method === 'POST' && (url.pathname === '/partie' || url.pathname === '/aktion') && !herkunftOk(req.headers)) {
+        res.writeHead(403, { 'content-type': 'application/json' }).end(JSON.stringify({ ok: false, fehler: 'Fremde Herkunft' })); return
+      }
       if (req.method === 'POST' && url.pathname === '/partie') {
         const body = await lies(req)
         const neu = neuePartie(body)   // wirft bei ungueltigem Namen, bevor Kopfzeilen gesendet sind

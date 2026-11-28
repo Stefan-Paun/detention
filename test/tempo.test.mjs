@@ -15,6 +15,7 @@ test('Tempo: Werte, Pruefung der Aktion, nur beim Zuschauen', () => {
   assert.equal(tempoAktion(sp, { art: 'tempo', wert: 'schnell' }), null); assert.equal(sp.tempo, 'schnell')
   assert.match(tempoAktion(sp, { art: 'tempo', wert: 'turbo' }), /langsam, normal, schnell/); assert.equal(sp.tempo, 'schnell')
   assert.match(tempoAktion(sp, { art: 'tempo', wert: 'toString' }), /Tempo/)
+  assert.match(tempoAktion(sp, { art: 'tempo', wert: ['schnell'] }), /Tempo/); assert.equal(sp.tempo, 'schnell')
   assert.equal(tempoAktion(sp, { art: 'pause', wert: true }), null); assert.equal(sp.pausiert, true)
   assert.match(tempoAktion(sp, { art: 'pause', wert: 'ja' }), /true oder false/); assert.equal(sp.pausiert, true)
   assert.match(tempoAktion({ zuschauen: false }, { art: 'pause', wert: true }), /nur beim Zuschauen/)
@@ -119,4 +120,19 @@ test('Demo: der lokale Spielleiter kennt Tempo und Pause wie der Server', async 
   l.partie({ name: 'Kim' })
   assert.equal(l.aktion({ art: 'pause', wert: true }).ok, false)
   l.beenden()
+})
+
+test('Server: POST /partie und /aktion von fremder Herkunft werden abgewiesen (403)', async () => {
+  const fabrik = (name, rolle, { zufall: z }) => skriptGehirn(name, rolle, z)
+  const s = erstelleServer({ gehirnFabrik: fabrik, port: 0, pause: 5, startwert: 3, log: () => {} })
+  const port = await s.starten()
+  const roh = (pfad, kopf, body) => fetch(`http://127.0.0.1:${port}${pfad}`, { method: 'POST', headers: kopf, body: JSON.stringify(body) })
+  try {
+    assert.equal((await roh('/partie', { 'content-type': 'text/plain', origin: 'https://boese.example' }, { zuschauen: true })).status, 403)
+    assert.equal(s.partie(), null, 'keine Partie gestartet')
+    assert.equal((await roh('/partie', { 'content-type': 'application/json', 'sec-fetch-site': 'cross-site' }, { zuschauen: true })).status, 403)
+    assert.equal((await roh('/partie', { 'content-type': 'application/json', origin: `http://localhost:${port}`, 'sec-fetch-site': 'same-origin' }, { zuschauen: true })).status, 200)
+    assert.equal((await roh('/aktion', { 'content-type': 'text/plain', origin: 'https://boese.example' }, { art: 'pause', wert: true })).status, 403)
+    assert.equal((await status(port)).pausiert, false)
+  } finally { await s.schliessen() }
 })

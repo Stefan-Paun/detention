@@ -24,16 +24,18 @@ export function partieZeile(ereignisse, spieler, datum = new Date().toISOString(
   let raus = null
   let letzteWahl = null
   const eingesperrtMit = []
-  const gegen = {}
+  const wahlJeTag = new Map()   // nacht -> letzte Zettelwahl des Tages (eine Stichwahl ersetzt die erste Runde)
   for (const e of ereignisse) {
     if (e.art === 'zettelwahl') {
       letzteWahl = e.stimmen || {}
-      for (const [von, fuer] of Object.entries(letzteWahl)) if (fuer === spieler && von !== spieler) gegen[von] = (gegen[von] || 0) + 1
+      wahlJeTag.set(e.nacht, letzteWahl)
     } else if (e.art === 'eingesperrt') {
       if (e.name === spieler) raus ??= { nacht: e.nacht, wie: 'keller' }
       else if (letzteWahl?.[spieler] === e.name) eingesperrtMit.push(e.name)
     } else if (e.art === 'verschwunden' && e.name === spieler) raus ??= { nacht: e.nacht, wie: 'verschwunden' }
   }
+  const gegen = {}
+  for (const stimmen of wahlJeTag.values()) for (const [von, fuer] of Object.entries(stimmen)) if (fuer === spieler && von !== spieler) gegen[von] = (gegen[von] || 0) + 1
   return {
     datum, rolle, sieger: ende.sieger, gewonnen: gewinnt(rolle, ende.sieger),
     naechte: wahrheit.naechte?.length ?? 0, raus, eingesperrtMit, gegen,
