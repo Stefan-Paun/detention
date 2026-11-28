@@ -54,6 +54,25 @@ $('r-schrecken').onclick = () => { einstellungen.schrecken = !einstellungen.schr
 $('r-daemmerung').onclick = () => { einstellungen.daemmerung = !einstellungen.daemmerung; if (einstellungen.daemmerung) ton.ausschalten(); else if (einstellungen.ton) ton.einschalten(); zeigeEinstellungen(); zeigeSzene() }
 zeigeEinstellungen()
 
+// --- Tempo und Pause (nur beim Zuschauen; der Stand kommt vom Spielleiter im Status) ---------
+function zeigeTempo() {
+  const an = !!status?.zuschauen && status.phase !== 'ende' && !!status.tempo
+  $('tempo').hidden = !an
+  if (!an) return
+  for (const b of document.querySelectorAll('#tempo [data-tempo]')) b.setAttribute('aria-pressed', String(b.dataset.tempo === status.tempo))
+  $('r-pause').setAttribute('aria-pressed', String(!!status.pausiert))
+  $('r-pause').textContent = status.pausiert ? 'Weiter' : 'Pause'
+}
+async function steuere(aktion) {
+  if (DEMO) { const d = leiter?.aktion(aktion) ?? { ok: false, fehler: 'Keine laufende Partie' }; $('fehler').textContent = d.ok ? '' : d.fehler; return }
+  try {
+    const d = await (await fetch('/aktion', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(aktion) })).json()
+    $('fehler').textContent = d.ok ? '' : d.fehler
+  } catch { $('fehler').textContent = 'Keine Verbindung zum Spiel' }
+}
+for (const b of document.querySelectorAll('#tempo [data-tempo]')) b.onclick = () => steuere({ art: 'tempo', wert: b.dataset.tempo })
+$('r-pause').onclick = () => steuere({ art: 'pause', wert: !status?.pausiert })
+
 // Ein Schreck pro Nacht, nur wenn gerade keine Eingabe offen ist (die Sekunde der Frage ist still)
 function vielleichtErschrecken() {
   if (!einstellungen.schrecken || einstellungen.daemmerung) return
@@ -318,7 +337,7 @@ function zeigeKlasse() {
     if (status.rollen?.[n] && (keller || status.phase === 'ende' || status.zuschauen)) s.textContent += ` · ${ROLLE[status.rollen[n]]}`
     t.appendChild(name); t.appendChild(s); li.appendChild(t); ul.appendChild(li)
   }
-  $('phase').textContent = status.phase === 'ende' ? 'Die Tür geht auf.' : `${PHASE[status.phase] || ''}${status.nacht ? ` · Nacht ${status.nacht}` : ''}`
+  $('phase').textContent = status.phase === 'ende' ? 'Die Tür geht auf.' : `${PHASE[status.phase] || ''}${status.nacht ? ` · Nacht ${status.nacht}` : ''}${status.pausiert ? ' · angehalten' : ''}`
   $('lampe').classList.toggle('aus', status.phase === 'nacht')
   $('neu').hidden = false
   $('heftknopf').hidden = !(status.hefte && status.phase === 'ende')
@@ -403,11 +422,11 @@ async function starten(zuschauen) {
 if (!DEMO) starteEditor({ onAenderung: (ok) => { for (const b of document.querySelectorAll('#startform button[type="submit"], #zuschauen')) b.disabled = !ok } }).catch(() => {})
 $('startform').onsubmit = (ev) => { ev.preventDefault(); starten(false) }
 $('zuschauen').onclick = () => starten(true)
-$('neu').onclick = () => { $('raum').hidden = true; $('eingabe').hidden = true; $('start').hidden = false; $('neu').hidden = true; quelle?.close(); quelle = null; leiter?.beenden() }
+$('neu').onclick = () => { $('tempo').hidden = true; $('raum').hidden = true; $('eingabe').hidden = true; $('start').hidden = false; $('neu').hidden = true; quelle?.close(); quelle = null; leiter?.beenden() }
 
 // Was mit jeder Nachricht passiert, egal ob sie vom Server-Stream oder vom lokalen Spielleiter kommt
 const EMPFANG = {
-  status: (s) => { status = s; if (!status) return; zeigeKlasse(); zeigeTafel(); zeigeWarte(status.warte); zeigeBilanz() },
+  status: (s) => { status = s; if (!status) return; zeigeKlasse(); zeigeTafel(); zeigeWarte(status.warte); zeigeBilanz(); zeigeTempo() },
   ereignis: (e) => zeigeEreignis(e),
   tippt: (d) => zeigeTippt(d.von, d.fertig),
   warte: (w) => zeigeWarte(w),

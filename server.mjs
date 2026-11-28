@@ -19,6 +19,7 @@ import { ORT_NAMEN, KLASSENBUCH } from './spiel/welt.mjs'
 import { hefteSpeicher } from './spiel/hefte.mjs'
 import { partienSpeicher } from './spiel/partienspeicher.mjs'
 import { partieZeile, auswerten, bilanzSatz } from './spiel/statistik.mjs'
+import { tempoPause, mitBremse, tempoAktion, istTempoAktion } from './spiel/tempo.mjs'
 import { figurenSpeicher } from './spiel/figurenspeicher.mjs'
 import { pruefeFigur, kennung, MAX_EIGENE, GRENZEN } from './spiel/figurenschema.mjs'
 import { browserModule } from './tools/seite.mjs'
@@ -73,7 +74,7 @@ export function erstelleServer({ gehirnFabrik, hefte = null, figuren: eigene = n
     rollen: spiel.zuschauen || spiel.p.phase === 'ende' ? spiel.p.rollen : null,
     figuren: spiel.figuren, warte: spiel.mensch?.wartetAuf() ?? null, orte: ORT_NAMEN, klassenbuch: KLASSENBUCH, hefte: !!hefte, hefteGeschrieben: spiel.hefteGeschrieben,
     geist: !!spiel.spieler && !spiel.p.lebende.includes(spiel.spieler), untersuchungenUebrig: spiel.spieler ? P.untersuchungenUebrig(spiel.p, spiel.spieler) : null,
-    bilanz: spiel.bilanz ?? null,
+    bilanz: spiel.bilanz ?? null, tempo: spiel.tempo, pausiert: spiel.pausiert,
   }
   // Zuschauer sehen alles. Der Spieler sieht, was seine Figur sehen darf; ist er verschwunden
   // oder im Keller, schaut er als Geist weiter zu (alles ausser privaten Nacht-Ereignissen).
@@ -108,19 +109,19 @@ export function erstelleServer({ gehirnFabrik, hefte = null, figuren: eigene = n
     const datenVon = Object.fromEntries(ki.map((f) => [f.name, f]))
     const figuren = Object.fromEntries(namen.map((n) => [n, n === spieler ? { haut: '#f1cfb0', haar: '#2b2118', frisur: 'wuschel', shirt: '#bd93f9' } : (datenVon[n] ?? ladeFigur(n)).aussehen]))
     const gehirne = {}
-    const meins = { p, spieler, zuschauen, mensch: null, figuren: figuren, gehirne, hefteGeschrieben: false, beendet: false }
+    const meins = { p, spieler, zuschauen: !!zuschauen, mensch: null, figuren: figuren, gehirne, hefteGeschrieben: false, beendet: false, tempo: 'normal', pausiert: false }
     for (const n of namen) {
       if (n === spieler) { meins.mensch = browserGehirn(n, p.rollen[n], { sende }); gehirne[n] = meins.mensch }
       else {
         const g = gehirnFabrik(n, p.rollen[n], { mitspieler: namen, spieler, zufall: z, heft: hefte ? hefte.alsText(n) : '', figur: datenVon[n] ?? ladeFigur(n) })
-        gehirne[n] = mitTippen(g, n, meins)
+        gehirne[n] = mitBremse(mitTippen(g, n, meins), meins)   // erst die Pause abwarten, dann "tippt" und Aufruf
       }
     }
     if (spiel) { spiel.beendet = true; if (spiel.p.phase !== 'ende') spiel.mensch?.abbrechen() }   // alte Partie stoppt (Schleife, Tippen, Hefte)
     meins.kennung = ++partien
     spiel = meins
     const beobachter = (e) => { if (meins.beendet) return; if (sichtbar(e)) sende('ereignis', fuerBrowser(e)); sende('status', status()) }
-    spieleBisZumEnde(p, gehirne, { zufall: z, beobachter, abbruch: () => meins.beendet, pause: () => new Promise((f) => setTimeout(f, pause)) })
+    spieleBisZumEnde(p, gehirne, { zufall: z, beobachter, abbruch: () => meins.beendet, pause: tempoPause(meins, pause) })
       .then(() => { statistikSchreiben(meins); return hefteSchreiben(meins) })
       .catch((f) => {
         log(`Partie beendet: ${f.message}`)
@@ -231,6 +232,13 @@ export function erstelleServer({ gehirnFabrik, hefte = null, figuren: eigene = n
       }
       if (req.method === 'POST' && url.pathname === '/aktion') {
         const body = await lies(req)
+        if (istTempoAktion(body)) {
+          // Tempo und Pause: nur beim Zuschauen; alle Browser sehen den neuen Stand im Status
+          const fehler = tempoAktion(spiel, body)
+          if (!fehler) sende('status', status())
+          res.writeHead(fehler ? 400 : 200, { 'content-type': 'application/json' }).end(JSON.stringify({ ok: !fehler, fehler, tempo: spiel?.tempo ?? null, pausiert: spiel?.pausiert ?? null }))
+          return
+        }
         const fehler = spiel?.mensch ? spiel.mensch.aktion(body) : 'Keine laufende Partie'
         res.writeHead(fehler ? 400 : 200, { 'content-type': 'application/json' }).end(JSON.stringify({ ok: !fehler, fehler }))
         return

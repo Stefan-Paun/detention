@@ -17,6 +17,12 @@
     <button class="schalter" id="r-schrecken" aria-pressed="true" title="Kleine Schreckmomente in der Nacht (Gestalt, Fenster, Flackern)">Schrecken</button>
     <button class="schalter" id="r-daemmerung" aria-pressed="false" title="Alles ruhiger: heller, ohne Schrecken, ohne Bewegung">Dämmerung</button>
   </div>
+  <div class="regler" id="tempo" role="group" aria-label="Tempo beim Zuschauen" hidden>
+    <button class="schalter" data-tempo="langsam" aria-pressed="false" title="Mehr Zeit zum Lesen">Langsam</button>
+    <button class="schalter" data-tempo="normal" aria-pressed="true">Normal</button>
+    <button class="schalter" data-tempo="schnell" aria-pressed="false" title="Kurze Pausen zwischen den Schritten">Schnell</button>
+    <button class="schalter" id="r-pause" aria-pressed="false" title="Anhalten: Solange Pause ist, startet keine Figur einen neuen Zug">Pause</button>
+  </div>
   <button class="knopf leise" id="heftknopf" hidden>Hefte lesen</button>
   <button class="knopf leise" id="neu" hidden>Neue Partie</button>
 </header>

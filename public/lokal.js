@@ -11,6 +11,7 @@ import { skriptGehirn } from '../spiel/skriptgehirne.mjs'
 import { ORT_NAMEN, KLASSENBUCH } from '../spiel/welt.mjs'
 import { pruefeName, KI_FIGUREN, ZUSCHAUER_ERSATZ } from '../spiel/name.mjs'
 import { AUSSEHEN, SPIELER_AUSSEHEN } from '../spiel/demofiguren.mjs'
+import { tempoPause, tempoMs, mitBremse, tempoAktion, istTempoAktion } from '../spiel/tempo.mjs'
 
 const schlafe = (ms) => new Promise((f) => setTimeout(f, ms))
 
@@ -28,7 +29,7 @@ export function lokalerSpielleiter({ pause = 900, denkzeit = [400, 1100], startw
     rollen: spiel.zuschauen || spiel.p.phase === 'ende' ? spiel.p.rollen : null,
     figuren: spiel.figuren, warte: spiel.mensch?.wartetAuf() ?? null, orte: ORT_NAMEN, klassenbuch: KLASSENBUCH, hefte: false, hefteGeschrieben: false,
     geist: !!spiel.spieler && !spiel.p.lebende.includes(spiel.spieler), untersuchungenUebrig: spiel.spieler ? P.untersuchungenUebrig(spiel.p, spiel.spieler) : null,
-    demo: true,
+    demo: true, tempo: spiel.tempo, pausiert: spiel.pausiert,
   }
   // Wie im Server: Zuschauer und Geister sehen alles, der Spieler nur, was seine Figur sehen darf
   const sichtbar = (sp, e) => sp.zuschauen || e.sichtbar.includes(sp.spieler) || !sp.p.lebende.includes(sp.spieler)
@@ -37,7 +38,7 @@ export function lokalerSpielleiter({ pause = 900, denkzeit = [400, 1100], startw
   // Skript-Figuren antworten sofort; eine kurze Denkpause mit "überlegt" macht die Partie lesbar
   function mitTippen(g, n, sp) {
     const melde = meldeFuer(sp)
-    const denken = () => (denkzeit[1] > 0 ? schlafe(denkzeit[0] + Math.random() * (denkzeit[1] - denkzeit[0])) : Promise.resolve())
+    const denken = () => (denkzeit[1] > 0 ? schlafe(tempoMs(denkzeit[0] + Math.random() * (denkzeit[1] - denkzeit[0]), sp.tempo)) : Promise.resolve())
     const h = (fn) => async (...a) => { melde('tippt', { von: n }); try { await denken(); return fn(...a) } finally { melde('tippt', { von: n, fertig: true }) } }
     return { ...g, abend: h(g.abend), nacht: g.nacht, diskussion: h(g.diskussion), abstimmung: h(g.abstimmung) }
   }
@@ -49,20 +50,20 @@ export function lokalerSpielleiter({ pause = 900, denkzeit = [400, 1100], startw
     const z = zufall(startwert ?? Date.now())
     const p = P.neuePartie(namen, z, { spieler })
     const figuren = Object.fromEntries(namen.map((n) => [n, n === spieler ? SPIELER_AUSSEHEN : AUSSEHEN[n]]))
-    const sp = { p, spieler, zuschauen: !!zuschauen, mensch: null, figuren, beendet: false }
+    const sp = { p, spieler, zuschauen: !!zuschauen, mensch: null, figuren, beendet: false, tempo: 'normal', pausiert: false }
     const melde = meldeFuer(sp)
     const mitPetze = !!P.petze(p)
     const gehirne = {}
     for (const n of namen) {
       if (n === spieler) { sp.mensch = browserGehirn(n, p.rollen[n], { sende: melde }); gehirne[n] = sp.mensch }
-      else gehirne[n] = mitTippen(skriptGehirn(n, p.rollen[n], z, { mitPetze }), n, sp)
+      else gehirne[n] = mitBremse(mitTippen(skriptGehirn(n, p.rollen[n], z, { mitPetze }), n, sp), sp)
     }
     beenden()                       // alte Partie stoppt
     spiel = sp
     const beobachter = (e) => { if (sp.beendet) return; if (sichtbar(sp, e)) sende('ereignis', fuerBrowser(e)); sende('status', status()) }
     // Erst im naechsten Takt los, damit der Browser vorher aufraeumen und zuhoeren kann
     sp.lauf = schlafe(0)
-      .then(() => spieleBisZumEnde(p, gehirne, { zufall: z, beobachter, abbruch: () => sp.beendet, pause: () => (pause > 0 ? schlafe(pause) : Promise.resolve()) }))
+      .then(() => spieleBisZumEnde(p, gehirne, { zufall: z, beobachter, abbruch: () => sp.beendet, pause: tempoPause(sp, pause) }))
       .then(() => { if (!sp.beendet) sende('status', status()) })
       .catch(() => {
         if (sp.beendet) return
@@ -82,7 +83,14 @@ export function lokalerSpielleiter({ pause = 900, denkzeit = [400, 1100], startw
     // Ereignisse wie beim Server-Stream: status, ereignis, tippt, warte
     an(art, fn) { if (!hoerer.has(art)) hoerer.set(art, new Set()); hoerer.get(art).add(fn); return () => hoerer.get(art).delete(fn) },
     partie,
-    aktion(a) { const fehler = spiel?.mensch ? spiel.mensch.aktion(a ?? {}) : 'Keine laufende Partie'; return { ok: !fehler, fehler } },
+    aktion(a) {
+      if (istTempoAktion(a)) {   // Tempo und Pause wie beim Server: nur beim Zuschauen
+        const fehler = tempoAktion(spiel, a)
+        if (!fehler) sende('status', status())
+        return { ok: !fehler, fehler }
+      }
+      const fehler = spiel?.mensch ? spiel.mensch.aktion(a ?? {}) : 'Keine laufende Partie'; return { ok: !fehler, fehler }
+    },
     status,
     beenden,
     lauf: () => spiel?.lauf ?? Promise.resolve(),

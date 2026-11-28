@@ -49,7 +49,7 @@ Der Schlüssel wird nur vom lokalen Server gelesen und nie an den Browser geschi
 npm start
 ```
 
-Dann [http://localhost:4800](http://localhost:4800) öffnen, Namen eintippen, **Mitspielen**. Mit **Nur zuschauen** spielen sieben Figuren ohne dich. Beenden mit `Strg+C`.
+Dann [http://localhost:4800](http://localhost:4800) öffnen, Namen eintippen, **Mitspielen**. Mit **Nur zuschauen** spielen sieben Figuren ohne dich. Beim Zuschauen stellst du oben das Tempo ein (**Langsam**, **Normal**, **Schnell**) und hältst mit **Pause** an; solange Pause ist, startet keine Figur einen neuen (kostenpflichtigen) Zug. Ohne Browser: `POST /aktion` mit `{"art":"tempo","wert":"schnell"}` oder `{"art":"pause","wert":true}`. Beenden mit `Strg+C`.
 
 **Ohne Schlüssel ausprobieren:** `npm start -- --skript` startet dieselbe Oberfläche mit einfachen Skript-Figuren. Die reden Unsinn, aber du siehst das Spiel, kostenlos.
 
