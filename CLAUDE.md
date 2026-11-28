@@ -7,6 +7,7 @@ Werwolf-artiges Spiel: Stefan + sechs Claude-Figuren (Mira, Jonas, Lea, Tarik, N
 - `npm test`: alles ohne Netz (Regeln, Gehirn mit Fake-API, Kosten, Simulation). Exit-Code prüfen.
 - `npm run simuliere`: Partien mit Skript-Gehirnen, kostet nichts.
 - `npm run labor`: Regelvarianten in je 2000 Skript-Partien vergleichen (Tabelle + `ausgabe/labor.html`, kostet nichts). Befund in `docs/balance-labor.md`.
+- `npm run statistik`: Siege nach Rolle aus `partien.jsonl` im Datenordner (eine Zeile je Mitspiel-Partie, `spiel/statistik.mjs` rein und browsertauglich, `spiel/partienspeicher.mjs` schreibt).
 - `npm run spiele` / `-- --zuschauen`: echte Haiku-Aufrufe, Cent-Beträge. Nur nach Stefans OK starten.
 - `node tools/zug.mjs <port> …`: mitspielen von der Kommandozeile (auch für Test-Agenten). `GET /verlauf?ab=n` liefert sichtbare Ereignisse als JSON.
 - Tester-Runde 31.10.: 10 Agenten mit Personas spielten je eine Partie (eigene Server 4810–4819 mit `XDG_DATA_HOME` je Agent). Feedback floss in v1.1 ein (geheime Abstimmung, Nacht-1-Schutz, Vorzeigen).

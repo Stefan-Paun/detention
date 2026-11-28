@@ -81,6 +81,7 @@ body.daemmerung .lampe { transition: none; }
 .karte p.schwer { font-weight: 600; color: var(--papier); }
 .karte p.fund::before { content: "✎ "; color: #c9b6ee; }
 .karte p.notiz { font-style: italic; }
+.karte p.bilanz { margin-top: 10px; padding-top: 8px; border-top: 1px solid #4a3b6a; color: var(--lampe); }
 .karte p.ereignis { color: var(--text); border-top: 1px dashed var(--linie); padding-top: 6px; margin-top: 8px; }
 .tippt { color: var(--gedaempft); font-size: 14px; padding-left: 50px; min-height: 20px; }
 .tippt i { display: inline-block; width: 6px; height: 6px; margin-left: 3px; border-radius: 50%; background: var(--gedaempft); animation: punkt 1s infinite; }

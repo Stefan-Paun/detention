@@ -13,7 +13,8 @@
     "simuliere": "node tools/simuliere.mjs",
     "labor": "node tools/labor.mjs",
     "spiele": "node tools/spiele.mjs",
-    "kosten": "node tools/kosten.mjs"
+    "kosten": "node tools/kosten.mjs",
+    "statistik": "node tools/statistik.mjs"
   },
   "license": "MIT"
 }

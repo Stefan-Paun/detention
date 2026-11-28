@@ -5,6 +5,7 @@ import { layout, zeichneFigur, klasseAnimator, waehleSchreck } from './klasse.js
 import { tonAnlage } from './ton.js'
 import { starteEditor, besetzung } from './editor.js'
 import { farbeFuer } from './besetzung.js'
+import { soLiefEs } from '../spiel/statistik.mjs'
 
 const $ = (id) => document.getElementById(id)
 // Demo ohne Server: auf GitHub Pages (jeder Host ausser localhost) oder mit ?demo=1. Dann spielt
@@ -36,6 +37,8 @@ const szene = klasseAnimator($('szene'))
 let sprecher = null, pulte = null
 const ton = tonAnlage()
 let schreckeBenutzt = []
+let gesehen = []        // alle gezeigten Ereignisse dieser Partie (fuer die Schluss-Karte „So lief es“)
+let soKarte = null      // die Schluss-Karte, damit die Bilanz aus dem Status nachkommen kann
 
 // --- Einstellungen: Ton, Schrecken, Daemmerung (nur fuer diesen Browser gemerkt) ------------
 const einstellungen = { ton: false, schrecken: true, daemmerung: false }
@@ -114,6 +117,7 @@ function zeigeEreignis(e) {
     hoechsteNr = e.nr
   }
   const ich = status?.spieler
+  gesehen.push(e)
   merke(e)
   switch (e.art) {
     case 'start': regie(e.text); break
@@ -125,6 +129,7 @@ function zeigeEreignis(e) {
       const k = karte('morgen', 'Die Wahrheit')
       kartenZeile(k, Object.entries(e.rollen).map(([n, r]) => `${n === ich ? 'Du' : n}: ${ROLLE[r]}`).join(' · '), 'schwer')
       for (const n of e.naechte) kartenZeile(k, `Nacht ${n.nacht}: ${Object.entries(n.plaetze).map(([k2, o]) => `${k2 === ich ? 'du' : k2} ${BEI[o] || o}`).join(', ')}. ${n.schatten} holt ${n.opfer}${n.verwischt ? ' und verwischt die Spur' : ''}.`)
+      zeigeSoLiefEs()
       break
     }
     case 'petze-prueft': regie(`${e.wer && e.wer !== ich ? `${e.wer} erfährt` : 'Du erfährst'} von ${e.ziel}: ${ROLLE[e.rolle]}.`, 'geheim'); break
@@ -154,6 +159,20 @@ function zeigeEreignis(e) {
     case 'ende': regie(e.sieger === 'schueler' ? `Die Schüler haben gewonnen. Der Schatten war ${e.schatten}.` : `Der Schatten hat gewonnen. Es war ${e.schatten}.`, 'ende'); ton.klang(e.sieger === 'schueler' ? 'ende-schueler' : 'ende-schatten'); break
   }
   zeigeTafel()
+}
+
+// Schluss-Karte unter der Wahrheit; die Bilanz ueber alle Partien kommt vom Server im Status (nur Mitspielen)
+function zeigeSoLiefEs() {
+  const zeilen = soLiefEs(gesehen, status?.spieler ?? null)
+  if (!zeilen.length) return
+  soKarte = karte('morgen solief', 'So lief es')
+  zeilen.forEach((t, i) => kartenZeile(soKarte, t, i === 0 ? 'schwer' : ''))
+  zeigeBilanz()
+}
+function zeigeBilanz() {
+  if (!soKarte || soKarte.dataset.bilanz || !status?.bilanz) return
+  soKarte.dataset.bilanz = '1'
+  kartenZeile(soKarte, status.bilanz, 'bilanz')
 }
 
 // --- Spurentafel: was ich ueber die letzte Nacht sicher weiss -------------------------------
@@ -363,7 +382,7 @@ $('sagen').onsubmit = (ev) => { ev.preventDefault(); const text = $('text').valu
 $('schweigen').onclick = () => sende({ art: 'schweigt' })
 
 // --- Start und Verbindung --------------------------------------------------------------
-function frisch() { hoechsteNr = -1; verlauf.innerHTML = ''; tippende = new Map(); karten = { privat: null, morgen: null }; wissen = leeresWissen(0); pulte = null; sprecher = null; schreckeBenutzt = []; $('meinerolle').textContent = '' }
+function frisch() { gesehen = []; soKarte = null; hoechsteNr = -1; verlauf.innerHTML = ''; tippende = new Map(); karten = { privat: null, morgen: null }; wissen = leeresWissen(0); pulte = null; sprecher = null; schreckeBenutzt = []; $('meinerolle').textContent = '' }
 async function starten(zuschauen) {
   const name = $('name').value.trim()
   if (!zuschauen && !name) { $('name').focus(); return }
@@ -388,7 +407,7 @@ $('neu').onclick = () => { $('raum').hidden = true; $('eingabe').hidden = true; 
 
 // Was mit jeder Nachricht passiert, egal ob sie vom Server-Stream oder vom lokalen Spielleiter kommt
 const EMPFANG = {
-  status: (s) => { status = s; if (!status) return; zeigeKlasse(); zeigeTafel(); zeigeWarte(status.warte) },
+  status: (s) => { status = s; if (!status) return; zeigeKlasse(); zeigeTafel(); zeigeWarte(status.warte); zeigeBilanz() },
   ereignis: (e) => zeigeEreignis(e),
   tippt: (d) => zeigeTippt(d.von, d.fertig),
   warte: (w) => zeigeWarte(w),

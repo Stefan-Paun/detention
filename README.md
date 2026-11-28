@@ -67,6 +67,8 @@ Die Figuren laufen auf Claude Haiku 5.5. Eine Partie braucht 40 bis 80 Aufrufe u
 | Figuren schweigen, Rückfall-Meldungen im Terminal | Tagesdeckel erreicht oder Netz weg; `npm start` zeigt es |
 | Port belegt | `NACHSITZEN_PORT=4801 npm start` |
 
+Nach jeder Partie, in der du mitspielst, zeigt die Karte **So lief es** unter der Wahrheit, wer wann fiel, ob du gewonnen hast und wer am öftesten gegen dich gestimmt hat, dazu eine Zeile über alle Partien („Partie 7: 3 Siege als Schüler, 1 als Schatten“). Dafür kommt eine Zeile in `partien.jsonl` im Datenordner (nur Rolle, Sieger, Nächte und Figurennamen; nicht dein Name, nichts aus den Heften; Zuschauer-Partien zählen nicht). `npm run statistik` druckt die Tabelle.
+
 Mitspielen geht auch ohne Browser: `node tools/zug.mjs 4800 --neu DeinName`, dann `node tools/zug.mjs 4800` und die Befehle, die es vorschlägt; `--tafel` zeigt die Spurentafel als Text. `npm run spiele` spielt ganz im Terminal und blendet die Tafel vor jedem Gespräch ein.
 
 ## Was passiert
@@ -114,6 +116,7 @@ npm run simuliere                 # 100 Partien mit Skript-Gehirnen, Siegquoten
 node tools/balance.mjs 2000 1     # Schatten-Siegquote für 4–8 Figuren, mit und ohne Petze
 npm run labor                     # Balance-Labor: Regelvarianten in je 2000 Skript-Partien, Tabelle + HTML-Bericht
 npm run spiele -- --zuschauen     # eine echte Partie im Terminal (kostet Cent)
+npm run statistik                 # Siege nach Rolle, Serien, häufigster Gegner (aus partien.jsonl)
 node tools/seite.mjs _site        # statische Browser-Demo bauen (wie der Pages-Workflow)
 ```
 
