@@ -8,6 +8,14 @@
     "Ich habe nichts gesehen. Ich sage es, wenn ich etwas sehe.",
     "Nora hat recht."
   ],
+  "kennt": {
+    "Mira": "Will immer bestimmen. Hält sich für fair, schreibt Leute aber schnell ab.",
+    "Jonas": "Macht Witze, wenn es ernst wird. Manchmal steckt darin die richtige Beobachtung.",
+    "Tarik": "Redet, bevor er denkt. Hat sich einmal für mich mit einem aus der Achten angelegt.",
+    "Nora": "Die Einzige, mit der ich in der Pause gern rede. Sie fragt nach, statt zu urteilen.",
+    "Sam": "Neu. Glaubt zu schnell, was andere sagen.",
+    "Ben": "Sieht mehr, als er zugibt. Wir schweigen beide gern."
+  },
   "aussehen": {
     "haut": "#f6dcc3",
     "haar": "#1c1c22",

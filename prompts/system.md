@@ -21,7 +21,7 @@ Beispiele für deine Art zu reden:
 - Die Schüler gewinnen, wenn der Schatten im Keller ist. Der Schatten gewinnt, wenn nur noch zwei Personen übrig sind.
 - Mitspieler: {{mitspieler}}. {{spielerhinweis}}
 
-{{heft}}## Deine Rolle in dieser Partie
+{{kennt}}{{heft}}## Deine Rolle in dieser Partie
 {{rolle}}
 
 ## So verhältst du dich

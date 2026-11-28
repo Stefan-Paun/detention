@@ -49,7 +49,7 @@ Der Schlüssel wird nur vom lokalen Server gelesen und nie an den Browser geschi
 npm start
 ```
 
-Dann [http://localhost:4800](http://localhost:4800) öffnen, Namen eintippen, **Mitspielen**. Mit **Nur zuschauen** spielen sieben Figuren ohne dich. Beenden mit `Strg+C`.
+Dann [http://localhost:4800](http://localhost:4800) öffnen, Namen eintippen, **Mitspielen**. Mit **Nur zuschauen** spielen sieben Figuren ohne dich. Beim Zuschauen stellst du oben das Tempo ein (**Langsam**, **Normal**, **Schnell**) und hältst mit **Pause** an; solange Pause ist, startet keine Figur einen neuen (kostenpflichtigen) Zug. Ohne Browser: `POST /aktion` mit `{"art":"tempo","wert":"schnell"}` oder `{"art":"pause","wert":true}`. Beenden mit `Strg+C`.
 
 **Ohne Schlüssel ausprobieren:** `npm start -- --skript` startet dieselbe Oberfläche mit einfachen Skript-Figuren. Die reden Unsinn, aber du siehst das Spiel, kostenlos.
 
@@ -66,6 +66,8 @@ Die Figuren laufen auf Claude Haiku 5.5. Eine Partie braucht 40 bis 80 Aufrufe u
 | `API 400` mit `credit balance` | kein Guthaben im Anthropic-Konto |
 | Figuren schweigen, Rückfall-Meldungen im Terminal | Tagesdeckel erreicht oder Netz weg; `npm start` zeigt es |
 | Port belegt | `NACHSITZEN_PORT=4801 npm start` |
+
+Nach jeder Partie, in der du mitspielst, zeigt die Karte **So lief es** unter der Wahrheit, wer wann fiel, ob du gewonnen hast und wer am öftesten gegen dich gestimmt hat, dazu eine Zeile über alle Partien („Partie 7: 3 Siege als Schüler, 1 als Schatten“). Dafür kommt eine Zeile in `partien.jsonl` im Datenordner (nur Rolle, Sieger, Nächte und Figurennamen; nicht dein Name, nichts aus den Heften; Zuschauer-Partien und mit „Neue Partie“ abgebrochene Partien zählen nicht). `npm run statistik` druckt die Tabelle.
 
 Mitspielen geht auch ohne Browser: `node tools/zug.mjs 4800 --neu DeinName`, dann `node tools/zug.mjs 4800` und die Befehle, die es vorschlägt; `--tafel` zeigt die Spurentafel als Text. `npm run spiele` spielt ganz im Terminal und blendet die Tafel vor jedem Gespräch ein.
 
@@ -92,7 +94,7 @@ Regler oben: **Ton** (Wind und Klavier aus WebAudio), **Schrecken** (höchstens 
 
 ## Die Figuren
 
-Mira (Klassensprecherin, will Ordnung), Jonas (Witzbold, lenkt ab), Lea (still, merkt sich Widersprüche), Tarik (impulsiv, loyal), Nora (misstrauisch, rechnet), Sam (neu, glaubt zu schnell) und, wenn du nur zuschaust, Ben (Wiederholer, trocken). Ihre Charaktere stehen in `figuren/*.json`, die Spielregeln für sie in `prompts/`.
+Mira (Klassensprecherin, will Ordnung), Jonas (Witzbold, lenkt ab), Lea (still, merkt sich Widersprüche), Tarik (impulsiv, loyal), Nora (misstrauisch, rechnet), Sam (neu, glaubt zu schnell) und, wenn du nur zuschaust, Ben (Wiederholer, trocken). Ihre Charaktere stehen in `figuren/*.json`, die Spielregeln für sie in `prompts/`. Sie kennen sich schon vor der ersten Partie: Jede mitgelieferte Figur hat im Feld `kennt` einen Satz über jede andere (Jonas und Tarik sind beste Freunde, Mira sitzt seit der 5. Klasse neben Jonas, Lea traut Nora …). In den Prompt kommen nur die Sätze über Figuren, die in dieser Partie im Raum sind; über dich steht dort nichts.
 
 ### Eigene Figuren
 
@@ -114,6 +116,7 @@ npm run simuliere                 # 100 Partien mit Skript-Gehirnen, Siegquoten
 node tools/balance.mjs 2000 1     # Schatten-Siegquote für 4–8 Figuren, mit und ohne Petze
 npm run labor                     # Balance-Labor: Regelvarianten in je 2000 Skript-Partien, Tabelle + HTML-Bericht
 npm run spiele -- --zuschauen     # eine echte Partie im Terminal (kostet Cent)
+npm run statistik                 # Siege nach Rolle, Serien, häufigster Gegner (aus partien.jsonl)
 node tools/seite.mjs _site        # statische Browser-Demo bauen (wie der Pages-Workflow)
 ```
 

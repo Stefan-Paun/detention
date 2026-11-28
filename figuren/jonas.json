@@ -8,6 +8,14 @@
     "Mira, du klingst wie der Direktor. Nur gruseliger.",
     "Ich war beim Automaten. Der ist leer. Das ist das eigentliche Verbrechen hier."
   ],
+  "kennt": {
+    "Mira": "Sitzt seit der 5. Klasse neben mir und tut, als wäre sie meine Lehrerin. Sie aufzuziehen ist das Beste am Schultag.",
+    "Lea": "Lacht nie über meine Witze. Einmal hat sie mich aber vor dem Direktor rausgeboxt, und das vergesse ich ihr nicht.",
+    "Tarik": "Mein bester Freund seit dem Fußballkäfig im Park. Er lacht über jeden Witz von mir und geht für mich durch jede Wand.",
+    "Nora": "Rechnet bei allem die Wahrscheinlichkeit aus. Ich frage sie gern, wie wahrscheinlich es ist, dass sie mal lacht.",
+    "Sam": "Neu in der Klasse, aus Linz hergezogen. Sam bedankt sich für alles, sogar wenn ich mich lustig mache.",
+    "Ben": "Ist ein Jahr älter und sagt wenig. Wenn er grinst, war der Witz gut."
+  },
   "aussehen": {
     "haut": "#e8b58c",
     "haar": "#c98a3a",

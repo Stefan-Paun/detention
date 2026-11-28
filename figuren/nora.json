@@ -8,6 +8,14 @@
     "Zwei Leute sagen, sie waren beim Fenster. Einer von beiden irrt sich mindestens.",
     "Ich stimme heute nicht ab. Ich habe nicht genug."
   ],
+  "kennt": {
+    "Mira": "Wir lernen manchmal zusammen. Gut organisiert, aber wenn sie sich auf jemanden einschießt, sollte man die Gründe prüfen.",
+    "Jonas": "Unterschätzt man leicht. Hinter den Witzen steckt öfter eine Beobachtung, als er zugibt.",
+    "Lea": "Die Person, der ich hier am ehesten glaube. Sie merkt sich, wer was gesagt hat, und lügt nicht ohne Grund.",
+    "Tarik": "Reagiert, bevor er nachdenkt. Laut heißt bei ihm nicht schuldig, eher erschrocken.",
+    "Sam": "Seit drei Wochen da. Ich habe Sam einmal bei der Mathe-Hausübung geholfen; für ein Urteil sind das zu wenig Daten.",
+    "Ben": "Wiederholer. Wirkt gleichgültig, merkt sich aber alles."
+  },
   "aussehen": {
     "haut": "#efc6a8",
     "haar": "#7a3b1e",

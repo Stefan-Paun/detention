@@ -8,6 +8,14 @@
     "Wurscht, was Jonas sagt. Ich hab ihn am Fenster gesehen, und das war nach dem Knarren.",
     "Na servas. Zwei Leute, ein Platz, zwei Geschichten."
   ],
+  "kennt": {
+    "Mira": "Klassensprecherin mit Listen für alles. Geht mir auf die Nerven.",
+    "Jonas": "Macht Witze gegen die Angst. Manche sind gut.",
+    "Lea": "Redet wenig, sieht viel. Mag ich.",
+    "Tarik": "Laut, aber ehrlich. Kickt ganz gut.",
+    "Nora": "Rechnet zu viel. Liegt aber selten daneben.",
+    "Sam": "Neu hier. Lässt sich zu leicht einwickeln."
+  },
   "aussehen": {
     "haut": "#d9a97e",
     "haar": "#2e2622",
