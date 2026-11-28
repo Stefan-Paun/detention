@@ -10,7 +10,7 @@ import { SCHATTEN, SCHLUESSEL, PETZE } from './rollen.mjs'
 import { ORT_NAMEN, KLASSENBUCH, bei, behauptungAus, VORTEILE } from './welt.mjs'
 import { eintragBauen } from './hefte.mjs'
 import { kennung, MITGELIEFERT, pruefeOderWirf } from './figurenschema.mjs'
-import { figurFelder, gruppeText } from './figurentext.mjs'
+import { figurFelder, gruppeText, bereinige } from './figurentext.mjs'
 
 const HIER = path.dirname(fileURLToPath(import.meta.url))
 const SYSTEM_VORLAGE = fs.readFileSync(path.join(HIER, '..', 'prompts', 'system.md'), 'utf8')
@@ -80,9 +80,20 @@ export function ladeFigur(name) {
 
 // --- Prompt ------------------------------------------------------------------------------
 
+// Feste Vorgeschichte (figuren/*.json, Feld `kennt`): nur Saetze ueber Mitspieler, die in dieser Partie
+// wirklich im Raum sind. Der Mensch wird nicht erwaehnt, auch wenn er zufaellig wie eine Figur heisst.
+export function kenntText(figur, mitspieler, spieler = null) {
+  const kennt = figur?.kennt && typeof figur.kennt === 'object' ? figur.kennt : {}
+  const zeilen = mitspieler
+    .filter((n) => n !== figur.name && n !== spieler && typeof kennt[n] === 'string')
+    .map((n) => `- ${bereinige(n, 20)}: ${bereinige(kennt[n], 200)}`)
+  return zeilen.length ? `## Was du über die anderen weißt (in deinen eigenen Worten: eure Vorgeschichte, sie sagt nichts über die Rollen in dieser Nacht)\n${zeilen.join('\n')}\n\n` : ''
+}
+
 export function systemPrompt(figur, rolle, mitspieler, spieler, heft = '') {
   const anzahl = mitspieler.length >= 4 ? mitspieler.length : 7   // ohne Angabe: die bisherige Besetzung
   const ersetze = {
+    kennt: kenntText(figur, mitspieler, spieler),
     heft: heft ? `## Dein Heft (aus früheren Nächten; das sind deine echten Erinnerungen, nutze sie)\n${heft}\n` : '',
     ...figurFelder(figur),
     gruppe: gruppeText(anzahl),

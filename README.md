@@ -94,7 +94,7 @@ Regler oben: **Ton** (Wind und Klavier aus WebAudio), **Schrecken** (höchstens 
 
 ## Die Figuren
 
-Mira (Klassensprecherin, will Ordnung), Jonas (Witzbold, lenkt ab), Lea (still, merkt sich Widersprüche), Tarik (impulsiv, loyal), Nora (misstrauisch, rechnet), Sam (neu, glaubt zu schnell) und, wenn du nur zuschaust, Ben (Wiederholer, trocken). Ihre Charaktere stehen in `figuren/*.json`, die Spielregeln für sie in `prompts/`.
+Mira (Klassensprecherin, will Ordnung), Jonas (Witzbold, lenkt ab), Lea (still, merkt sich Widersprüche), Tarik (impulsiv, loyal), Nora (misstrauisch, rechnet), Sam (neu, glaubt zu schnell) und, wenn du nur zuschaust, Ben (Wiederholer, trocken). Ihre Charaktere stehen in `figuren/*.json`, die Spielregeln für sie in `prompts/`. Sie kennen sich schon vor der ersten Partie: Jede mitgelieferte Figur hat im Feld `kennt` einen Satz über jede andere (Jonas und Tarik sind beste Freunde, Mira sitzt seit der 5. Klasse neben Jonas, Lea traut Nora …). In den Prompt kommen nur die Sätze über Figuren, die in dieser Partie im Raum sind; über dich steht dort nichts.
 
 ### Eigene Figuren
 

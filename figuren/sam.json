@@ -8,6 +8,14 @@
     "Na ja, ich will niemandem was unterstellen, aber das passt eigentlich nicht zusammen, Tarik.",
     "Danke, dass du's sagst. Dann bleib ich bei dem, was ich gesehen hab: Du warst nicht dort."
   ],
+  "kennt": {
+    "Mira": "Hat mir am ersten Tag die Schule gezeigt. Ich bin ihr was schuldig.",
+    "Jonas": "Lustig, aber ich weiß nie, ob er über mich lacht.",
+    "Lea": "Sehr still. Ich habe mich noch nicht getraut, sie anzusprechen.",
+    "Tarik": "Hat mich in der ersten Woche angeblafft. Seitdem bin ich vorsichtig.",
+    "Nora": "Hat mir bei der Mathe-Hausübung geholfen, ohne dass ich fragen musste.",
+    "Ben": "Ein Jahr älter, sitzt hinten. Hat mir mal gesagt, wo der Kaffeeautomat funktioniert."
+  },
   "aussehen": {
     "haut": "#e9c2a0",
     "haar": "#5a3a22",

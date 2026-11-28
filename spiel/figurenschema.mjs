@@ -17,9 +17,13 @@ export const GRENZEN = {
   stil: { min: 10, max: 300 },
   beispiele: { min: 1, max: 3, jedes: { min: 5, max: 160 } },
   geheimnis: { min: 0, max: 200 },
+  kennt: { jedes: { min: 10, max: 200 } },   // nur mitgelieferte Figuren: Name -> ein Satz aus Sicht der Figur
 }
 export const PFLICHTFELDER = ['name', 'beschreibung', 'stil', 'beispiele']
 export const ERLAUBTE_FELDER = ['name', 'alter', 'beschreibung', 'stil', 'beispiele', 'geheimnis', 'aussehen']
+// Feste Vorgeschichte (Freundschaften, Rivalitaeten) gibt es nur fuer die mitgelieferten Figuren; eigene
+// Figuren aus dem Editor duerfen das Feld nicht setzen (es wuerde Saetze in fremde Prompts schreiben).
+export const NUR_EINGEBAUT = ['kennt']
 
 const NAME_MUSTER = /^[A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ0-9 '-]*$/
 // In Freitexten verboten: Steuer-/Formatzeichen, Klammern und Zeichen, mit denen man Markierungen
@@ -47,7 +51,7 @@ export function pruefeFigur(roh, { eingebaut = false } = {}) {
   const fehler = []
   const f = (feld, text) => fehler.push({ feld, text })
   if (!roh || typeof roh !== 'object' || Array.isArray(roh)) return { ok: false, fehler: [{ feld: null, text: 'Die Figur muss ein Objekt sein' }], figur: null }
-  for (const k of Object.keys(roh)) if (!ERLAUBTE_FELDER.includes(k)) f(k, `Unbekanntes Feld „${k.slice(0, 30).replace(/[\p{Cc}\p{Cf}]/gu, '')}“`)
+  for (const k of Object.keys(roh)) if (!ERLAUBTE_FELDER.includes(k) && !(eingebaut && NUR_EINGEBAUT.includes(k))) f(k, `Unbekanntes Feld „${k.slice(0, 30).replace(/[\p{Cc}\p{Cf}]/gu, '')}“`)
   const figur = {}
 
   const text = (feld, { pflicht }) => {
@@ -97,6 +101,22 @@ export function pruefeFigur(roh, { eingebaut = false } = {}) {
 
   const geheimnis = text('geheimnis', { pflicht: false })
   if (geheimnis) figur.geheimnis = geheimnis
+
+  if (eingebaut && roh.kennt !== undefined && roh.kennt !== null) {
+    const k = roh.kennt
+    const g = GRENZEN.kennt.jedes
+    if (typeof k !== 'object' || Array.isArray(k)) f('kennt', 'Muss ein Objekt sein (Name -> Satz)')
+    else {
+      const aus = {}
+      for (const [n, satz] of Object.entries(k)) {
+        if (!MITGELIEFERT.includes(n) || n === name) f('kennt', `Unbekannte Figur „${String(n).slice(0, 20).replace(/[\p{Cc}\p{Cf}]/gu, '')}“`)
+        else if (typeof satz !== 'string' || TEXT_VERBOTEN.test(satz)) f('kennt', `${n}: Text ohne Steuerzeichen, < > « » { } oder \``)
+        else if (sauber(satz).length < g.min || sauber(satz).length > g.max) f('kennt', `${n}: ${g.min} bis ${g.max} Zeichen`)
+        else aus[n] = sauber(satz)
+      }
+      figur.kennt = aus
+    }
+  }
 
   if (roh.aussehen !== undefined && roh.aussehen !== null) {
     const a = roh.aussehen

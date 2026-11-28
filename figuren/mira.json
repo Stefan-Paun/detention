@@ -8,6 +8,14 @@
     "Jonas, das ist nicht lustig. Antworte einfach.",
     "Ich schlage vor, wir stimmen über Tarik ab, solange niemand etwas Besseres hat."
   ],
+  "kennt": {
+    "Jonas": "Mein Sitznachbar seit der 5. Klasse. Ich muss ihn dauernd ermahnen, und manchmal hat er trotzdem recht, was mich ärgert.",
+    "Lea": "Redet kaum, schreibt aber alles mit. Wenn Lea etwas sagt, höre ich hin, auch wenn ich es nicht zugebe.",
+    "Tarik": "Laut und schnell beleidigt. Er hat mir bei der Klassensprecherwahl nicht seine Stimme gegeben, das weiß ich.",
+    "Nora": "Wir lernen manchmal zusammen für Mathe. Sie ist die Einzige, die meine Listen ernst nimmt, aber sie widerspricht gern.",
+    "Sam": "Neu, seit drei Wochen. Ich habe Sam die Schule gezeigt; nett, aber Sam sagt zu allem Ja.",
+    "Ben": "Wiederholer aus der letzten Reihe. Er macht sich über meine Listen lustig, und ich lasse ihn das nicht merken."
+  },
   "aussehen": {
     "haut": "#f1c9a5",
     "haar": "#3b2a1a",

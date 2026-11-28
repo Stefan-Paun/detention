@@ -8,6 +8,14 @@
     "Ernsthaft, Mira? Du warst diejenige, die als Letzte beim Licht war.",
     "Ich hab keine Ahnung, okay? Ich will nur raus hier."
   ],
+  "kennt": {
+    "Mira": "Die Klassensprecherin. Ich habe sie nicht gewählt, und sie lässt mich das spüren.",
+    "Jonas": "Mein bester Freund. Wer Jonas angreift, bekommt es mit mir zu tun.",
+    "Lea": "Sagt kaum was, aber wenn, dann sitzt es. Ich habe ihr mal geholfen, und sie hat sich nie bedankt; passt schon.",
+    "Nora": "Rechnet mir immer vor, warum ich falsch liege. Nervt, weil sie oft recht hat.",
+    "Sam": "Neu in der Klasse. Ich habe Sam in der ersten Woche angeblafft und es nie wiedergutgemacht.",
+    "Ben": "Spielt mit uns Fußball im Park, wenn er Lust hat. Ich respektiere ihn."
+  },
   "aussehen": {
     "haut": "#c98b5e",
     "haar": "#161616",
